@@ -34,24 +34,28 @@ namespace SMGI.Plugin.CartoExt
 
         private AxMapControl currentMapControl;
         private IMap currentMap;    //当前MapControl控件中的Map对象    
-  
-        IFeatureLayer[] featureLayersArray = new IFeatureLayer[2];
-        IFeatureClass[] featureClassesArray = new IFeatureClass[2];
-        IFeatureCursor[] featureCursorsArray = new IFeatureCursor[2];
-        IFeature[] featuresArray = new IFeature[2];
-        String[] fieldNamesArray = new String[2];
-        int[] fieldIndexArray = new int[2];
-        String[] fieldValuesArray = new String[2];
+
+        int length;
+        static IFeatureLayer[] featureLayersArray;
+        static IFeatureClass[] featureClassesArray;
+        static IFeatureCursor[] featureCursorsArray;
+        static IFeature[] featuresArray;
+        static String[] fieldNamesArray;
+        static int[] fieldIndexArray;
+        static String[] fieldValuesArray;
 
         List<string> CrossingFieldValuesList = new List<string>();
 
         public override void OnClick()
         {
             GetCurrentMap();
-            
+
+            length = currentMap.LayerCount;
+            featureLayersArray = new IFeatureLayer[length];
             featureLayersArray[0] = GetFeatureLayerByName(currentMap, "RESA");
             featureLayersArray[1] = GetFeatureLayerByName(currentMap, "LRDL");
 
+            fieldNamesArray = new String[length];
             fieldNamesArray[0] = "name";
             fieldNamesArray[1] = "class1";
 
@@ -96,7 +100,9 @@ namespace SMGI.Plugin.CartoExt
         // 主函数，用于处理 A 图层与 B 图层的穿过情况并更新 "b" 字段值
         public void ProcessCrossing()
         {
-            for (int i = 0; i <= 2-1; i++)
+            featureClassesArray = new IFeatureClass[length];
+
+            for (int i = 0; i <= length - 1; i++)
             {
 
                 featureClassesArray[i] = featureLayersArray[i].FeatureClass;
@@ -106,9 +112,11 @@ namespace SMGI.Plugin.CartoExt
             int crossingBFeatureCount = 0;
 
             // 遍历 B 图层要素并处理穿过情况
+            featureCursorsArray = new IFeatureCursor[length];
             featureCursorsArray[1] = featureClassesArray[1].Update(null, false);
 
             // 获取 B 图层中的第一个要素
+            featuresArray = new IFeature[length];
             featuresArray[1] = featureCursorsArray[1].NextFeature();
 
             // 遍历 B 图层中的所有要素
@@ -134,14 +142,13 @@ namespace SMGI.Plugin.CartoExt
                 // 查询 B 图层中的下一个要素
                 featuresArray[1] = featureCursorsArray[1].NextFeature();
             }
-            //Marshal.ReleaseComObject(pCursorB);
 
             // 获取与 A 图层穿过的 B 图层中元素的数量
             MessageBox.Show("与 " + featureLayersArray[0].Name + " 图层穿过的 " + featureLayersArray[1].Name + " 图层中元素的总数：" + crossingBFeatureCount, "统计数据", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
         }
 
-        // 子函数，获取与 B 图层要素穿过的 A 图层的单个要素的 "a" 字段值列表
+        // 子函数，对于 B 图层中的单个要素，获取其穿过的 A 图层中的所有要素的 "a" 字段值列表
         private void GetCrossingFieldValues()
         {
             CrossingFieldValuesList.Clear();
@@ -162,7 +169,10 @@ namespace SMGI.Plugin.CartoExt
             // 遍历所有与当前 B 图层穿过的 A 图层要素
             while (pFeatureCross != null)
             {
+                fieldIndexArray = new int[length];
                 fieldIndexArray[0] = pFeatureCross.Fields.FindField(fieldNamesArray[0]);
+
+                fieldValuesArray = new String[length];
                 fieldValuesArray[0] = pFeatureCross.get_Value(fieldIndexArray[0]).ToString();
 
                 // 如果 "a" 字段值在列表中不存在，则添加到列表
@@ -173,11 +183,10 @@ namespace SMGI.Plugin.CartoExt
 
                 // 查询下一个与当前 B 图层穿过的 A 图层要素
                 pFeatureCross = featureCursorsArray[0].NextFeature();
-            }
-            //Marshal.ReleaseComObject(pCursorA);
+            };
         }
 
-        // 子函数，更新 B 图层要素的 "b" 字段值
+        // 子函数，对于 B 图层中的单个要素，更新其 "b" 字段值
         private void UpdateFieldValues()
         {
             fieldIndexArray[1] = featuresArray[1].Fields.FindField(fieldNamesArray[1]);
