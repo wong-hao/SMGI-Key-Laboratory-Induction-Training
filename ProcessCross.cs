@@ -51,6 +51,7 @@ namespace SMGI.Plugin.CartoExt
 
         int crossingFeatureCount; // 记录穿过 B 图层中元素的 A 图层中元素的数量
         private IFeatureSelection crossingFeatureSelection; // 记录穿过 B 图层中元素的 A 图层中元素的选择集
+        bool isModified; // 标记是否进行了赋值操作
 
         public override void OnClick()
         {
@@ -76,15 +77,11 @@ namespace SMGI.Plugin.CartoExt
                     return;
                 }
 
-                crossingFeatureSelection = (IFeatureSelection)featureLayersArray[LRDLlyrFlag];
-
-
                 featureFieldNamesArray = new String[length];
                 featureFieldNamesArray[RESAlyrFlag] = "name";
                 featureFieldNamesArray[LRDLlyrFlag] = "class1";
 
                 ProcessCrossing();
-                MessageBox.Show("图层" + featureLayersArray[LRDLlyrFlag].Name + "的属性表赋值完成");
 
                 // Refresh the map to show selected features
                 currentMapControl.Refresh(esriViewDrawPhase.esriViewGeoSelection, null, null);
@@ -134,7 +131,8 @@ namespace SMGI.Plugin.CartoExt
         public void ProcessCrossing()
         {
             featureClassesArray = new IFeatureClass[length];
-            crossingFeatureCount = 0;
+            crossingFeatureSelection = (IFeatureSelection)featureLayersArray[LRDLlyrFlag]; // 初始化选择集
+            crossingFeatureCount = 0; // 初始化选择元素数量
 
             for (int i = 0; i <= length - 1; i++)
             {
@@ -178,6 +176,17 @@ namespace SMGI.Plugin.CartoExt
 
             // 获取与 A 图层穿过的 B 图层中元素的数量
             MessageBox.Show("图层" + featureLayersArray[LRDLlyrFlag].Name + "中与图层"+featureLayersArray[LRDLlyrFlag].Name+"穿过的元素的总数：" + crossingFeatureCount, "统计数据", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            // 在循环结束后，只有进行了赋值操作才输出提示信息
+            if (isModified)
+            {
+                // 输出字段赋值信息到弹出窗口
+                MessageBox.Show("图层 " + featureLayersArray[LRDLlyrFlag].Name + " 的字段 " + featureFieldNamesArray[LRDLlyrFlag] + " 已被修改");
+            }
+            else
+            {
+                MessageBox.Show("图层 " + featureLayersArray[LRDLlyrFlag].Name + " 的字段 " + featureFieldNamesArray[LRDLlyrFlag] + " 非空，未进行修改");
+            }
         }
 
         // 子函数，对于 B 图层中的单个要素，获取其穿过的 A 图层中的所有要素的 "a" 字段值组成的列表
@@ -222,9 +231,19 @@ namespace SMGI.Plugin.CartoExt
         private void UpdateFeatureFieldValues()
         {
             featureFieldIndexsArray[LRDLlyrFlag] = featuresArray[LRDLlyrFlag].Fields.FindField(featureFieldNamesArray[LRDLlyrFlag]);
-            featuresArray[LRDLlyrFlag].set_Value(featureFieldIndexsArray[LRDLlyrFlag], featureFieldValuesArray[LRDLlyrFlag]);
-            featureCursorsArray[LRDLlyrFlag].UpdateFeature(featuresArray[LRDLlyrFlag]);
-        }
+            object fieldValueObj = featuresArray[LRDLlyrFlag].get_Value(featureFieldIndexsArray[LRDLlyrFlag]);
 
+            // 检查 "b" 字段是否为空，如果为空则更新字段
+            if (fieldValueObj == null || DBNull.Value.Equals(fieldValueObj) || string.IsNullOrEmpty(fieldValueObj.ToString()))
+            {
+                string fieldName = featureFieldNamesArray[LRDLlyrFlag];
+                string fieldValue = featureFieldValuesArray[LRDLlyrFlag];
+                featuresArray[LRDLlyrFlag].set_Value(featureFieldIndexsArray[LRDLlyrFlag], fieldValue);
+                featureCursorsArray[LRDLlyrFlag].UpdateFeature(featuresArray[LRDLlyrFlag]);
+                isModified = true;
+            } else{
+                isModified = false;
+            }
+        }
     }
 }
