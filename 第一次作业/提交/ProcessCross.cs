@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Web;
 using System.Windows.Forms;
+using System.Runtime.InteropServices;
 using ESRI.ArcGIS.Carto;
 using ESRI.ArcGIS.Controls;
 using ESRI.ArcGIS.Display;
@@ -36,21 +37,20 @@ namespace SMGI.Plugin.CartoExt
         private IMap currentMap;    //当前MapControl控件中的Map对象    
 
         int length; //图层数量
-        int RESAlyrFlag = 0;
-        int LRDLlyrFlag = 1;
+        int SourcelyrFlag = 0;
+        int TargetlyrFlag = 1;
 
         static IFeatureLayer[] featureLayersArray;
         static IFeatureClass[] featureClassesArray;
         static IFeatureCursor[] featureCursorsArray;
         static IFeature[] featuresArray;
         static String[] featureFieldNamesArray;
-        static int[] featureFieldIndexsArray;
         static String[] featureFieldValuesArray;
 
         List<string> CrossingFieldValuesList = new List<string>();
 
-        int crossingFeatureCount; // 记录穿过 B 图层中元素的 A 图层中元素的数量
-        private IFeatureSelection crossingFeatureSelection; // 记录穿过 B 图层中元素的 A 图层中元素的选择集
+        int crossingFeatureCount; // 记录穿过目标图层中元素的源图层中元素的数量
+        private IFeatureSelection crossingFeatureSelection; // 记录穿过目标图层中元素的源图层中元素的选择集
         bool isModified; // 标记是否进行了赋值操作
 
         public override void OnClick()
@@ -68,18 +68,18 @@ namespace SMGI.Plugin.CartoExt
 
                 length = currentMap.LayerCount;
                 featureLayersArray = new IFeatureLayer[length];
-                featureLayersArray[RESAlyrFlag] = GetFeatureLayerByName(currentMap, "RESA");
-                featureLayersArray[LRDLlyrFlag] = GetFeatureLayerByName(currentMap, "LRDL");
+                featureLayersArray[SourcelyrFlag] = GetFeatureLayerByName(currentMap, "RESA");
+                featureLayersArray[TargetlyrFlag] = GetFeatureLayerByName(currentMap, "LRDL");
 
-                if (featureLayersArray[RESAlyrFlag] == null || featureLayersArray[LRDLlyrFlag] == null)
+                if (featureLayersArray[SourcelyrFlag] == null || featureLayersArray[TargetlyrFlag] == null)
                 {
-                    MessageBox.Show("未找到所需的图层，请确保地图中包含名为" + featureLayersArray[RESAlyrFlag].Name + "和 " + featureLayersArray[LRDLlyrFlag].Name + "的图层。", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("未找到所需的图层，请确保地图中包含名为" + featureLayersArray[SourcelyrFlag].Name + "和 " + featureLayersArray[TargetlyrFlag].Name + "的图层。", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
 
                 featureFieldNamesArray = new String[length];
-                featureFieldNamesArray[RESAlyrFlag] = "name";
-                featureFieldNamesArray[LRDLlyrFlag] = "class1";
+                featureFieldNamesArray[SourcelyrFlag] = "name";
+                featureFieldNamesArray[TargetlyrFlag] = "class1";
 
                 ProcessCrossing();
 
@@ -127,11 +127,11 @@ namespace SMGI.Plugin.CartoExt
             return null;
         }
 
-        // 主函数，用于处理 A 图层与 B 图层的穿过情况并更新 "b" 字段值
+        // 主函数，用于处理源图层与目标图层的穿过情况并更新目标字段值
         public void ProcessCrossing()
         {
             featureClassesArray = new IFeatureClass[length];
-            crossingFeatureSelection = (IFeatureSelection)featureLayersArray[LRDLlyrFlag]; // 初始化选择集
+            crossingFeatureSelection = (IFeatureSelection)featureLayersArray[TargetlyrFlag]; // 初始化选择集
             crossingFeatureCount = 0; // 初始化选择元素数量
 
             for (int i = 0; i <= length - 1; i++)
@@ -139,110 +139,159 @@ namespace SMGI.Plugin.CartoExt
                 featureClassesArray[i] = featureLayersArray[i].FeatureClass;
             }
 
-            // 遍历 B 图层要素并处理穿过情况
+            // 遍历目标图层要素并处理穿过情况
             featureCursorsArray = new IFeatureCursor[length];
-            featureCursorsArray[LRDLlyrFlag] = featureClassesArray[LRDLlyrFlag].Update(null, false);
+            featureCursorsArray[TargetlyrFlag] = featureClassesArray[TargetlyrFlag].Update(null, false);
 
-            // 获取 B 图层中的第一个要素
-            featuresArray = new IFeature[length];
-            featuresArray[LRDLlyrFlag] = featureCursorsArray[LRDLlyrFlag].NextFeature();
-
-            // 遍历 B 图层中的所有要素
-            while (featuresArray[LRDLlyrFlag] != null)
+            try
             {
-                GetCrossingFeatureFieldValues();
+                // 获取目标图层中的第一个要素
+                featuresArray = new IFeature[length];
+                featuresArray[TargetlyrFlag] = featureCursorsArray[TargetlyrFlag].NextFeature();
 
-                // 初始化字段值
-                featureFieldValuesArray[LRDLlyrFlag] = string.Empty;
-
-                // 如果该要素与 A 图层相交
-                if (CrossingFieldValuesList.Count != 0)
+                // 遍历目标图层中的所有要素
+                while (featuresArray[TargetlyrFlag] != null)
                 {
-                    featureFieldValuesArray[LRDLlyrFlag] = string.Join(",", CrossingFieldValuesList);
-                    crossingFeatureSelection.Add(featuresArray[LRDLlyrFlag]); //添加到选择集
-                    crossingFeatureCount++; //相交元素数量增加
-                }
-                else
-                {
-                    featureFieldValuesArray[LRDLlyrFlag] = "未穿过居民地面"; // 设置未与 A 图层穿过的 B 图层要素的 "b" 字段值为“未穿过居民地面”
-                }
+                    // 对于该目标图层元素，获取需要填充到目标字段的源图层元素的源字段值集合
+                    GetCrossingFeatureFieldValues();
 
-                // 更新 B 图层要素的 "b" 字段值
-                UpdateFeatureFieldValues();
-                
-                // 查询 B 图层中的下一个要素
-                featuresArray[LRDLlyrFlag] = featureCursorsArray[LRDLlyrFlag].NextFeature();
+                    // 初始化填充到目标字段的源图层元素的源字段值集合
+                    featureFieldValuesArray = new String[length];
+                    featureFieldValuesArray[TargetlyrFlag] = string.Empty;
+
+                    // 根据填充到目标字段的源图层元素的源字段值集合判断该目标图层要素是否与源图层元素相交
+                    if (CrossingFieldValuesList.Count != 0)
+                    {
+                        featureFieldValuesArray[TargetlyrFlag] = string.Join(",", CrossingFieldValuesList);
+                        crossingFeatureSelection.Add(featuresArray[TargetlyrFlag]); // 添加到选择集
+                        crossingFeatureCount++; // 相交元素数量增加
+                    }
+                    else
+                    {
+                        featureFieldValuesArray[TargetlyrFlag] = "未穿过居民地面"; // 设置未与源图层穿过的目标图层要素的目标字段值为“未穿过居民地面”
+                    }
+
+                    // 将填充到目标字段的源图层元素的源字段值填充到该目标图层要素的目标字段值
+                    UpdateFeatureFieldValues();
+
+                    // 查询目标图层中的下一个要素
+                    featuresArray[TargetlyrFlag] = featureCursorsArray[TargetlyrFlag].NextFeature();
+                }
+            }
+            finally
+            {
+                // 在 finally 块中确保释放游标资源
+                ReleaseFeatureCursor(featureCursorsArray[TargetlyrFlag]);
             }
 
-            // 获取与 A 图层穿过的 B 图层中元素的数量
-            MessageBox.Show("图层" + featureLayersArray[LRDLlyrFlag].Name + "中与图层"+featureLayersArray[LRDLlyrFlag].Name+"穿过的元素的总数：" + crossingFeatureCount, "统计数据", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            // 获取与源图层穿过的目标图层中元素的数量
+            MessageBox.Show("图层" + featureLayersArray[TargetlyrFlag].Name + "中与图层" + featureLayersArray[SourcelyrFlag].Name + "穿过的元素的总数：" + crossingFeatureCount, "统计数据", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             // 在循环结束后，只有进行了赋值操作才输出提示信息
             if (isModified)
             {
                 // 输出字段赋值信息到弹出窗口
-                MessageBox.Show("图层 " + featureLayersArray[LRDLlyrFlag].Name + " 的字段 " + featureFieldNamesArray[LRDLlyrFlag] + " 已被修改");
+                MessageBox.Show("图层 " + featureLayersArray[TargetlyrFlag].Name + " 的字段 " + featureFieldNamesArray[TargetlyrFlag] + " 已被填充");
             }
             else
             {
-                MessageBox.Show("图层 " + featureLayersArray[LRDLlyrFlag].Name + " 的字段 " + featureFieldNamesArray[LRDLlyrFlag] + " 非空，未进行修改");
+                MessageBox.Show("图层 " + featureLayersArray[TargetlyrFlag].Name + " 的字段 " + featureFieldNamesArray[TargetlyrFlag] + " 非空，未进行填充");
             }
         }
 
-        // 子函数，对于 B 图层中的单个要素，获取其穿过的 A 图层中的所有要素的 "a" 字段值组成的列表
+        // 子函数，对于目标图层中的单个要素，获取其穿过的源图层中的所有要素的源字段值组成的列表
         private void GetCrossingFeatureFieldValues()
         {
             CrossingFieldValuesList.Clear();
 
-            // 创建空间过滤器，查找与当前 B 图层要素穿过的 A 图层要素
+            // 创建空间过滤器，查找与当前目标图层要素穿过的源图层要素
             ISpatialFilter pSpatialFilter = new SpatialFilterClass
             {
-                Geometry = featuresArray[LRDLlyrFlag].Shape,
+                Geometry = featuresArray[TargetlyrFlag].Shape,
                 SpatialRel = esriSpatialRelEnum.esriSpatialRelCrosses
             };
 
-            // 使用游标遍历与当前 B 图层要素穿过的 A 图层要素
-            featureCursorsArray[RESAlyrFlag] = featureClassesArray[RESAlyrFlag].Search(pSpatialFilter, false);
+            // 使用游标遍历与当前目标图层要素穿过的源图层要素
+            featureCursorsArray[SourcelyrFlag] = featureClassesArray[SourcelyrFlag].Search(pSpatialFilter, false);
 
-            // 查询第一个与当前 B 图层穿过的 A 图层要素
-            IFeature pFeatureCross = featureCursorsArray[RESAlyrFlag].NextFeature();
+            // 查询第一个与当前目标图层穿过的源图层要素
+            IFeature pFeatureCross = featureCursorsArray[SourcelyrFlag].NextFeature();
 
-            // 遍历所有与当前 B 图层穿过的 A 图层要素
-            while (pFeatureCross != null)
+            try
             {
-                featureFieldIndexsArray = new int[length];
-                featureFieldIndexsArray[RESAlyrFlag] = pFeatureCross.Fields.FindField(featureFieldNamesArray[RESAlyrFlag]);
-
-                featureFieldValuesArray = new String[length];
-                featureFieldValuesArray[RESAlyrFlag] = pFeatureCross.get_Value(featureFieldIndexsArray[RESAlyrFlag]).ToString();
-
-                // 如果 "a" 字段值在列表中不存在，则添加到列表
-                if (!CrossingFieldValuesList.Contains(featureFieldValuesArray[RESAlyrFlag]))
+                // 遍历所有与当前目标图层穿过的源图层要素
+                while (pFeatureCross != null)
                 {
-                    CrossingFieldValuesList.Add(featureFieldValuesArray[RESAlyrFlag]);
-                }
+                    // 获取该源图层元素的源字段值
+                    string fieldValue = GetFeatureFieldValue(pFeatureCross, featureFieldNamesArray[SourcelyrFlag]);
 
-                // 查询下一个与当前 B 图层穿过的 A 图层要素
-                pFeatureCross = featureCursorsArray[RESAlyrFlag].NextFeature();
-            };
+                    // 获取非重复的源字段值添加到列表
+                    if (!string.IsNullOrEmpty(fieldValue) && !CrossingFieldValuesList.Contains(fieldValue))
+                    {
+                        CrossingFieldValuesList.Add(fieldValue);
+                    }
+
+                    // 查询下一个与当前目标图层穿过的源图层要素
+                    pFeatureCross = featureCursorsArray[SourcelyrFlag].NextFeature();
+                }
+            }
+            finally
+            {
+                // 在 finally 块中确保释放游标资源
+                ReleaseFeatureCursor(featureCursorsArray[SourcelyrFlag]);
+            }
         }
 
-        // 子函数，对于 B 图层中的单个要素，更新其 "b" 字段值
+        // 子函数，对于目标图层中的单个要素，更新其目标字段值
         private void UpdateFeatureFieldValues()
         {
-            featureFieldIndexsArray[LRDLlyrFlag] = featuresArray[LRDLlyrFlag].Fields.FindField(featureFieldNamesArray[LRDLlyrFlag]);
-            object fieldValueObj = featuresArray[LRDLlyrFlag].get_Value(featureFieldIndexsArray[LRDLlyrFlag]);
+            // 获取目标字段的当前值
+            string fieldValue = GetFeatureFieldValue(featuresArray[TargetlyrFlag], featureFieldNamesArray[TargetlyrFlag]);
 
-            // 检查 "b" 字段是否为空，如果为空则更新字段
-            if (fieldValueObj == null || DBNull.Value.Equals(fieldValueObj) || string.IsNullOrEmpty(fieldValueObj.ToString()))
+            // 检查目标字段是否为空，如果为空则更新字段
+            if (string.IsNullOrEmpty(fieldValue))
             {
-                string fieldName = featureFieldNamesArray[LRDLlyrFlag];
-                string fieldValue = featureFieldValuesArray[LRDLlyrFlag];
-                featuresArray[LRDLlyrFlag].set_Value(featureFieldIndexsArray[LRDLlyrFlag], fieldValue);
-                featureCursorsArray[LRDLlyrFlag].UpdateFeature(featuresArray[LRDLlyrFlag]);
-                isModified = true;
-            } else{
+                // 获取目标字段的索引
+                int fieldIndex = featuresArray[TargetlyrFlag].Fields.FindField(featureFieldNamesArray[TargetlyrFlag]);
+
+                // 若索引非空
+                if (fieldIndex >= 0)
+                {
+                    // 对填充目标字段
+                    featuresArray[TargetlyrFlag].set_Value(fieldIndex, featureFieldValuesArray[TargetlyrFlag]);
+                    featureCursorsArray[TargetlyrFlag].UpdateFeature(featuresArray[TargetlyrFlag]);
+                    isModified = true;
+                }
+            }
+            else
+            {
                 isModified = false;
+            }
+        }
+
+        // 获取要素的指定字段值
+        private string GetFeatureFieldValue(IFeature feature, string fieldName)
+        {
+            int fieldIndex = feature.Fields.FindField(fieldName);
+
+            if (fieldIndex >= 0)
+            {
+                object fieldValueObj = feature.get_Value(fieldIndex);
+                if (fieldValueObj != null && fieldValueObj != DBNull.Value)
+                {
+                    return fieldValueObj.ToString();
+                }
+            }
+
+            return string.Empty;
+        }
+
+        // 封装释放 IFeatureCursor 资源的子函数
+        private void ReleaseFeatureCursor(IFeatureCursor cursor)
+        {
+            if (cursor != null)
+            {
+                Marshal.ReleaseComObject(cursor);
             }
         }
     }
