@@ -22,7 +22,7 @@ namespace SMGI.Plugin.CartoExt
     {
         public ProcessCross()
         {
-            m_caption = "ProcessCross";
+            m_caption = "ProcessCross"; // 扩展的显示名称
         }
 
         public override bool Enabled
@@ -37,29 +37,29 @@ namespace SMGI.Plugin.CartoExt
         private IMap currentMap;    //当前MapControl控件中的Map对象    
 
         int length; //图层数量
-        int SourcelyrFlag = 0;
-        int TargetlyrFlag = 1;
+        int SourcelyrFlag = 0; // 源图层标志
+        int TargetlyrFlag = 1; // 目标图层标志
 
-        static IFeatureLayer[] featureLayersArray;
-        static IFeatureClass[] featureClassesArray;
-        static IFeatureCursor[] featureCursorsArray;
-        static IFeature[] featuresArray;
-        static String[] featureFieldNamesArray;
-        static String[] featureFieldValuesArray;
+        static IFeatureLayer[] featureLayersArray; // 存储要素图层的数组
+        static IFeatureClass[] featureClassesArray; // 存储要素类的数组
+        static IFeatureCursor[] featureCursorsArray; // 存储要素游标的数组
+        IFeature featureTarget; // 存储目标要素
+        static String[] featureFieldNamesArray; // 存储要素字段名的数组
+        String featureFieldValue = string.Empty; // 存储填充到目标字段的源图层元素的源字段值
 
-        int fieldIndex;
+        int fieldIndex; // 字段索引
 
-        List<string> CrossingFieldValuesList = new List<string>();
-
+        List<string> crossingFieldValuesList = new List<string>(); // 存储与目标图层相交的源图层要素字段值的列表作为缓冲区
         int crossingFeatureCount; // 记录穿过目标图层中元素的源图层中元素的数量
         private IFeatureSelection crossingFeatureSelection; // 记录穿过目标图层中元素的源图层中元素的选择集
         bool isModified; // 标记是否进行了赋值操作
 
+        // 点击扩展按钮时执行的操作
         public override void OnClick()
         {
             try
             {
-                GetCurrentMap();
+                GetCurrentMap(); // 获取当前地图
 
                 // 检查地图是否为空
                 if (currentMap == null)
@@ -68,24 +68,25 @@ namespace SMGI.Plugin.CartoExt
                     return;
                 }
 
-                length = currentMap.LayerCount;
-                featureLayersArray = new IFeatureLayer[length];
-                featureLayersArray[SourcelyrFlag] = GetFeatureLayerByName(currentMap, "RESA");
-                featureLayersArray[TargetlyrFlag] = GetFeatureLayerByName(currentMap, "LRDL");
+                length = currentMap.LayerCount; // 获取地图图层数量
+                featureLayersArray = new IFeatureLayer[length]; // 初始化要素图层数组
+                featureLayersArray[SourcelyrFlag] = GetFeatureLayerByName(currentMap, "RESA"); // 获取源图层
+                featureLayersArray[TargetlyrFlag] = GetFeatureLayerByName(currentMap, "LRDL"); // 获取目标图层
 
+                // 检查是否找到了源图层和目标图层
                 if (featureLayersArray[SourcelyrFlag] == null || featureLayersArray[TargetlyrFlag] == null)
                 {
                     MessageBox.Show("未找到所需的图层，请确保地图中包含名为" + featureLayersArray[SourcelyrFlag].Name + "和 " + featureLayersArray[TargetlyrFlag].Name + "的图层。", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
 
-                featureFieldNamesArray = new String[length];
-                featureFieldNamesArray[SourcelyrFlag] = "name";
-                featureFieldNamesArray[TargetlyrFlag] = "class1";
+                featureFieldNamesArray = new String[length]; // 初始化要素字段名数组 
+                featureFieldNamesArray[SourcelyrFlag] = "name"; // 设置源图层字段名
+                featureFieldNamesArray[TargetlyrFlag] = "class1"; // 设置目标图层字段名
 
-                ProcessCrossing();
+                ProcessCrossing(); // 处理图层穿过操作
 
-                // Refresh the map to show selected features
+                // 刷新地图以显示选择的要素
                 currentMapControl.Refresh(esriViewDrawPhase.esriViewGeoSelection, null, null);
 
             }
@@ -119,7 +120,7 @@ namespace SMGI.Plugin.CartoExt
                             return (IFeatureLayer)compositeLayer.get_Layer(j);
                     }
                 }
-                //如果图层不是图层组类型，则直接进行判断
+                // 如果图层不是图层组类型，则直接进行判断
                 else
                 {
                     if (map.get_Layer(i).Name == layerName)
@@ -129,10 +130,10 @@ namespace SMGI.Plugin.CartoExt
             return null;
         }
 
-        // 主函数，用于处理源图层与目标图层的穿过情况并更新目标字段值
+        // 主函数，用于处理源图层与目标图层的穿过情况并赋值目标字段值
         public void ProcessCrossing()
         {
-            featureClassesArray = new IFeatureClass[length];
+            featureClassesArray = new IFeatureClass[length]; // 初始化要素类数组
             crossingFeatureSelection = (IFeatureSelection)featureLayersArray[TargetlyrFlag]; // 初始化选择集
             crossingFeatureCount = 0; // 初始化选择元素数量
 
@@ -147,37 +148,31 @@ namespace SMGI.Plugin.CartoExt
 
             try
             {
-                // 获取目标图层中的第一个要素
-                featuresArray = new IFeature[length];
-                featuresArray[TargetlyrFlag] = featureCursorsArray[TargetlyrFlag].NextFeature();
+                featureTarget = featureCursorsArray[TargetlyrFlag].NextFeature(); // 获取目标图层中的第一个要素，用以初始化遍历循环
 
                 // 遍历目标图层中的所有要素
-                while (featuresArray[TargetlyrFlag] != null)
+                while (featureTarget != null)
                 {
-                    // 对于该目标图层元素，获取需要填充到目标字段的源图层元素的源字段值集合
+                    // 对于该目标图层元素，获取需要填充到目标字段的源图层元素的源字段值集合作为缓冲区
                     GetCrossingFeatureFieldValues();
 
-                    // 初始化填充到目标字段的源图层元素的源字段值集合
-                    featureFieldValuesArray = new String[length];
-                    featureFieldValuesArray[TargetlyrFlag] = string.Empty;
-
-                    // 根据填充到目标字段的源图层元素的源字段值集合判断该目标图层要素是否与源图层元素相交
-                    if (CrossingFieldValuesList.Count != 0)
+                    // 在初始化后，根据缓冲区是否为空判断该目标图层要素是否与源图层元素相交
+                    if (crossingFieldValuesList.Count != 0)
                     {
-                        featureFieldValuesArray[TargetlyrFlag] = string.Join(",", CrossingFieldValuesList);
-                        crossingFeatureSelection.Add(featuresArray[TargetlyrFlag]); // 添加到选择集
+                        featureFieldValue = string.Join(",", crossingFieldValuesList);
+                        crossingFeatureSelection.Add(featureTarget); // 添加到选择集
                         crossingFeatureCount++; // 相交元素数量增加
                     }
                     else
                     {
-                        featureFieldValuesArray[TargetlyrFlag] = "未穿过居民地面"; // 设置未与源图层穿过的目标图层要素的目标字段值为“未穿过居民地面”
+                        featureFieldValue = "未穿过居民地面"; // 设置填充字段值为“未穿过居民地面”
                     }
 
-                    // 将填充到目标字段的源图层元素的源字段值填充到该目标图层要素的目标字段值
+                    // 将填充字段值填充到该目标图层要素的目标字段值
                     UpdateFeatureFieldValues();
 
                     // 查询目标图层中的下一个要素
-                    featuresArray[TargetlyrFlag] = featureCursorsArray[TargetlyrFlag].NextFeature();
+                    featureTarget = featureCursorsArray[TargetlyrFlag].NextFeature();
                 }
             }
             finally
@@ -204,19 +199,19 @@ namespace SMGI.Plugin.CartoExt
         // 子函数，对于目标图层中的单个要素，获取其穿过的源图层中的所有要素的源字段值组成的列表
         private void GetCrossingFeatureFieldValues()
         {
-            CrossingFieldValuesList.Clear();
+            crossingFieldValuesList.Clear(); // 清空存储相交要素字段值的列表
 
             // 创建空间过滤器，查找与当前目标图层要素穿过的源图层要素
             ISpatialFilter pSpatialFilter = new SpatialFilterClass
             {
-                Geometry = featuresArray[TargetlyrFlag].Shape,
-                SpatialRel = esriSpatialRelEnum.esriSpatialRelCrosses
+                Geometry = featureTarget.Shape, // 获取目标图层要素的几何形状 
+                SpatialRel = esriSpatialRelEnum.esriSpatialRelCrosses // 设置空间关系为穿过
             };
 
             // 使用游标遍历与当前目标图层要素穿过的源图层要素
             featureCursorsArray[SourcelyrFlag] = featureClassesArray[SourcelyrFlag].Search(pSpatialFilter, false);
 
-            // 查询第一个与当前目标图层穿过的源图层要素
+            // 查询第一个与当前目标图层穿过的源图层要素，用以初始化遍历循环
             IFeature pFeatureCross = featureCursorsArray[SourcelyrFlag].NextFeature();
 
             try
@@ -228,9 +223,9 @@ namespace SMGI.Plugin.CartoExt
                     string fieldValue = GetFeatureFieldValue(pFeatureCross, featureFieldNamesArray[SourcelyrFlag]);
 
                     // 获取非重复的源字段值添加到列表
-                    if (!string.IsNullOrEmpty(fieldValue) && !CrossingFieldValuesList.Contains(fieldValue))
+                    if (!string.IsNullOrEmpty(fieldValue) && !crossingFieldValuesList.Contains(fieldValue))
                     {
-                        CrossingFieldValuesList.Add(fieldValue);
+                        crossingFieldValuesList.Add(fieldValue);
                     }
 
                     // 查询下一个与当前目标图层穿过的源图层要素
@@ -244,30 +239,30 @@ namespace SMGI.Plugin.CartoExt
             }
         }
 
-        // 子函数，对于目标图层中的单个要素，更新其目标字段值
+        // 子函数，对于目标图层中的当前要素，赋值其目标字段值
         private void UpdateFeatureFieldValues()
         {
-            // 获取目标字段的当前值
-            string fieldValue = GetFeatureFieldValue(featuresArray[TargetlyrFlag], featureFieldNamesArray[TargetlyrFlag]);
+            // 获取当前目标图层要素的目标字段值
+            string fieldValue = GetFeatureFieldValue(featureTarget, featureFieldNamesArray[TargetlyrFlag]);
 
-            // 检查目标字段是否为空，如果为空则更新字段
+            // 检查目标字段是否为空，如果为空则赋值字段
             if (string.IsNullOrEmpty(fieldValue))
             {
                 // 获取目标字段的索引
-                GetFieldIndex(featuresArray[TargetlyrFlag], featureFieldNamesArray[TargetlyrFlag]);
+                GetFieldIndex(featureTarget, featureFieldNamesArray[TargetlyrFlag]);
 
                 // 若索引非空
                 if (fieldIndex >= 0)
                 {
-                    // 对填充目标字段
-                    featuresArray[TargetlyrFlag].set_Value(fieldIndex, featureFieldValuesArray[TargetlyrFlag]);
-                    featureCursorsArray[TargetlyrFlag].UpdateFeature(featuresArray[TargetlyrFlag]);
-                    isModified = true;
+                    // 填充目标字段
+                    featureTarget.set_Value(fieldIndex, featureFieldValue);
+                    featureCursorsArray[TargetlyrFlag].UpdateFeature(featureTarget);
+                    isModified = true; // 标记已进行字段赋值操作
                 }
             }
             else
             {
-                isModified = false;
+                isModified = false; // 目标字段非空，无需赋值
             }
         }
 
