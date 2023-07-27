@@ -47,6 +47,8 @@ namespace SMGI.Plugin.CartoExt
         static String[] featureFieldNamesArray;
         static String[] featureFieldValuesArray;
 
+        int fieldIndex;
+
         List<string> CrossingFieldValuesList = new List<string>();
 
         int crossingFeatureCount; // 记录穿过目标图层中元素的源图层中元素的数量
@@ -252,7 +254,7 @@ namespace SMGI.Plugin.CartoExt
             if (string.IsNullOrEmpty(fieldValue))
             {
                 // 获取目标字段的索引
-                int fieldIndex = featuresArray[TargetlyrFlag].Fields.FindField(featureFieldNamesArray[TargetlyrFlag]);
+                GetFieldIndex(featuresArray[TargetlyrFlag], featureFieldNamesArray[TargetlyrFlag]);
 
                 // 若索引非空
                 if (fieldIndex >= 0)
@@ -272,7 +274,7 @@ namespace SMGI.Plugin.CartoExt
         // 获取要素的指定字段值
         private string GetFeatureFieldValue(IFeature feature, string fieldName)
         {
-            int fieldIndex = feature.Fields.FindField(fieldName);
+            GetFieldIndex(feature, fieldName);
 
             if (fieldIndex >= 0)
             {
@@ -284,6 +286,13 @@ namespace SMGI.Plugin.CartoExt
             }
 
             return string.Empty;
+        }
+
+        // 获取要素类中指定字段的索引的辅助函数
+        private void GetFieldIndex(IFeature feature, string fieldName)
+        {
+            fieldIndex = feature.Fields.FindField(fieldName);
+            return;
         }
 
         // 封装释放 IFeatureCursor 资源的子函数
