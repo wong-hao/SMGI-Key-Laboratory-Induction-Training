@@ -46,7 +46,7 @@ namespace SMGI.Plugin.CartoExt
 
         int fieldIndex; // 字段索引
 
-        List<string> crossingFieldValuesList = new List<string>(); // 存储与目标图层相交的源图层要素字段值的列表作为缓冲区
+        List<string> crossingFieldValuesList = new List<string>(); // 存储与目标图层穿过的源图层要素字段值的列表作为缓冲区
         private string sourceFieldValue; // 源字段值
         private string FutureTargetFieldValue; // 用于填充的目标字段值
         private string currentTargetFieldValue; // 目前的目标字段值
@@ -175,12 +175,12 @@ namespace SMGI.Plugin.CartoExt
                     // 对于该目标图层元素，使用列表存储需要填充到目标字段的源图层元素的源字段值列表
                     GetCrossingFeatureFieldValuesList();
 
-                    // 在初始化后，根据列表是否为空判断该目标图层要素是否与源图层元素相交
+                    // 若列表非空，则该目标图层要素至少穿过一个源图层元素
                     if (crossingFieldValuesList.Count != 0)
                     {
                         FutureTargetFieldValue = string.Join(",", crossingFieldValuesList);
                         crossingFeatureSelection.Add(featureTarget); // 添加到选择集
-                        crossingFeatureCount++; // 相交元素数量增加
+                        crossingFeatureCount++; // 穿过元素数量增加
                     }
                     else
                     {
@@ -235,7 +235,7 @@ namespace SMGI.Plugin.CartoExt
         /// </summary>
         private void GetCrossingFeatureFieldValuesList()
         {
-            crossingFieldValuesList.Clear(); // 清空存储相交要素字段值的列表
+            crossingFieldValuesList.Clear(); // 清空存储穿过要素字段值的列表
 
             // 创建空间过滤器，查找与当前目标图层要素穿过的源图层要素
             ISpatialFilter pSpatialFilter = new SpatialFilterClass
@@ -258,9 +258,10 @@ namespace SMGI.Plugin.CartoExt
                     // 获取该源图层元素的源字段值
                     sourceFieldValue = GetFeatureFieldValue(pFeatureCross, featureFieldNamesArray[SourcelyrFlag]);
 
-                    // 获取非重复的源字段值添加到列表
+                    // 当该源字段值非空且非重复时
                     if (!string.IsNullOrEmpty(sourceFieldValue) && !crossingFieldValuesList.Contains(sourceFieldValue))
                     {
+                        // 将其添加到列表
                         crossingFieldValuesList.Add(sourceFieldValue);
                     }
 
@@ -315,11 +316,15 @@ namespace SMGI.Plugin.CartoExt
         /// <param name="fieldName"></param>
         private string GetFeatureFieldValue(IFeature feature, string fieldName)
         {
+            // 根据字段名获取到字段索引
             GetFieldIndex(feature, fieldName);
 
             if (fieldIndex >= 0)
             {
+                // 根据字段索引获取到字段值
                 object fieldValueObj = feature.get_Value(fieldIndex);
+
+                // 判断是否为空
                 if (fieldValueObj != null && fieldValueObj != DBNull.Value)
                 {
                     return fieldValueObj.ToString();
