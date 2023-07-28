@@ -45,7 +45,6 @@ namespace SMGI.Plugin.CartoExt
         static IFeatureCursor[] featureCursorsArray; // 存储要素游标的数组
         IFeature featureTarget; // 存储目标要素
         static String[] featureFieldNamesArray; // 存储要素字段名的数组
-        String featureFieldValueBuffer = string.Empty; // 作为缓冲区存储填充到目标字段的源图层元素的源字段值
 
         int fieldIndex; // 字段索引
 
@@ -54,7 +53,11 @@ namespace SMGI.Plugin.CartoExt
         private IFeatureSelection crossingFeatureSelection; // 记录穿过目标图层中元素的源图层中元素的选择集
         bool isModified; // 标记是否进行了赋值操作
 
-        // 点击扩展按钮时执行的操作
+        /// <Date>2023/7/28</Date>
+        /// <Author>HaoWong</Author>
+        /// <summary>
+        /// 点击扩展按钮时执行的操作
+        /// </summary>
         public override void OnClick()
         {
             try
@@ -92,13 +95,24 @@ namespace SMGI.Plugin.CartoExt
             }
         }
 
+        /// <Date>2023/7/28</Date>
+        /// <Author>HaoWong</Author>
+        /// <summary>
+        /// 子函数，得到目前图层
+        /// </summary>
         private void GetCurrentMap()
         {
             currentMapControl = m_Application.MapControl;
             currentMap = currentMapControl.Map;
         }
 
-        // 在地图中根据图层名称获得矢量图层。
+        /// <Date>2023/7/28</Date>
+        /// <Author>HaoWong</Author>
+        /// <summary>
+        /// 在地图中根据图层名称获得矢量图层
+        /// </summary>
+        /// <param name="map"></param>
+        /// <param name="layerName"></param>
         private IFeatureLayer GetFeatureLayerByName(IMap map, string layerName)
         {
             //对地图中的图层进行遍历
@@ -126,7 +140,11 @@ namespace SMGI.Plugin.CartoExt
             return null;
         }
 
-        // 主函数，用于处理源图层与目标图层的穿过情况并赋值目标字段值
+        /// <Date>2023/7/28</Date>
+        /// <Author>HaoWong</Author>
+        /// <summary>
+        /// 主函数，处理图层穿过关系
+        /// </summary>
         public void ProcessCrossing()
         {
             featureClassesArray = new IFeatureClass[length]; // 初始化要素类数组
@@ -149,22 +167,17 @@ namespace SMGI.Plugin.CartoExt
                 // 遍历目标图层中的所有要素
                 while (featureTarget != null)
                 {
-                    // 对于该目标图层元素，使用缓冲区存储需要填充到目标字段的源图层元素的源字段值列表
+                    // 对于该目标图层元素，使用列表存储需要填充到目标字段的源图层元素的源字段值列表
                     GetCrossingFeatureFieldValuesList();
 
-                    // 在初始化后，根据缓冲区是否为空判断该目标图层要素是否与源图层元素相交
+                    // 在初始化后，根据列表是否为空判断该目标图层要素是否与源图层元素相交
                     if (crossingFieldValuesList.Count != 0)
                     {
-                        featureFieldValueBuffer = string.Join(",", crossingFieldValuesList);
                         crossingFeatureSelection.Add(featureTarget); // 添加到选择集
                         crossingFeatureCount++; // 相交元素数量增加
                     }
-                    else
-                    {
-                        featureFieldValueBuffer ="未穿过居民地面"; // 设置填充字段值为“未穿过居民地面”
-                    }
 
-                    // 将缓冲区内容填充到该目标图层要素的目标字段值
+                    // 将列表内容填充到该目标图层要素的目标字段值
                     UpdateFeatureFieldValues();
 
                     // 查询目标图层中的下一个要素
@@ -178,26 +191,31 @@ namespace SMGI.Plugin.CartoExt
             }
 
             // 获取与源图层穿过的目标图层中元素的数量
-            MessageBox.Show("图层"+ featureLayersArray[TargetlyrFlag].Name +"中与图层"+ featureLayersArray[SourcelyrFlag].Name +"穿过的元素的总数："+ crossingFeatureCount,"统计数据", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("图层" + featureLayersArray[TargetlyrFlag].Name + "中与图层" + featureLayersArray[SourcelyrFlag].Name + "穿过的元素的总数：" + crossingFeatureCount, "统计数据", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             // 在循环结束后，只有进行了赋值操作才输出提示信息
             if (isModified)
             {
                 // 输出字段赋值信息到弹出窗口
-                MessageBox.Show("图层"+ featureLayersArray[TargetlyrFlag].Name +"的字段"+ featureFieldNamesArray[TargetlyrFlag] +"已被填充","数据填充情况",MessageBoxButtons.OK,MessageBoxIcon.Information);
+                MessageBox.Show("图层" + featureLayersArray[TargetlyrFlag].Name + "的字段" + featureFieldNamesArray[TargetlyrFlag] + "已被填充", "数据填充情况", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             }
             else
             {
-                MessageBox.Show("图层"+ featureLayersArray[TargetlyrFlag].Name +"的字段"+ featureFieldNamesArray[TargetlyrFlag] +"非空，未进行填充","数据填充情况", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("图层" + featureLayersArray[TargetlyrFlag].Name + "的字段" + featureFieldNamesArray[TargetlyrFlag] + "非空，未进行填充", "数据填充情况", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
 
             // 刷新地图以显示选择集中的要素
             currentMapControl.Refresh(esriViewDrawPhase.esriViewGeoSelection, null, null);
-            MessageBox.Show("图层"+ featureLayersArray[TargetlyrFlag].Name +"中与图层"+ featureLayersArray[SourcelyrFlag].Name +"中元素穿过的元素均已被选中","可视化", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("图层" + featureLayersArray[TargetlyrFlag].Name + "中与图层" + featureLayersArray[SourcelyrFlag].Name + "中元素穿过的元素均已被选中", "可视化", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        // 子函数，对于目标图层中的单个要素，获取其穿过的源图层中的所有要素的源字段值组成的列表
+
+        /// <Date>2023/7/28</Date>
+        /// <Author>HaoWong</Author>
+        /// <summary>
+        /// 子函数，对于目标图层中的单个要素，获取其穿过的源图层中的所有要素的源字段值组成的列表
+        /// </summary>
         private void GetCrossingFeatureFieldValuesList()
         {
             crossingFieldValuesList.Clear(); // 清空存储相交要素字段值的列表
@@ -240,14 +258,18 @@ namespace SMGI.Plugin.CartoExt
             }
         }
 
-        // 子函数，对于目标图层中的当前要素，赋值其目标字段值
+        /// <Date>2023/7/28</Date>
+        /// <Author>HaoWong</Author>
+        /// <summary>
+        /// 子函数，对于目标图层中的当前要素，赋值其目标字段值
+        /// </summary>
         private void UpdateFeatureFieldValues()
         {
-            // 获取当前目标图层要素的目标字段值
-            string fieldValue = GetFeatureFieldValue(featureTarget, featureFieldNamesArray[TargetlyrFlag]);
+            // 获取当前目标图层要素的目标字段的当前值
+            string currentfieldValue = GetFeatureFieldValue(featureTarget, featureFieldNamesArray[TargetlyrFlag]);
 
-            // 检查目标字段是否为空，如果为空则赋值字段
-            if (string.IsNullOrEmpty(fieldValue))
+            // 检查目标字段当前值是否为空，如果为空则赋值字段
+            if (string.IsNullOrEmpty(currentfieldValue))
             {
                 // 获取目标字段的索引
                 GetFieldIndex(featureTarget, featureFieldNamesArray[TargetlyrFlag]);
@@ -256,7 +278,8 @@ namespace SMGI.Plugin.CartoExt
                 if (fieldIndex >= 0)
                 {
                     // 填充目标字段
-                    featureTarget.set_Value(fieldIndex, featureFieldValueBuffer);
+                    string fieldValue = string.Join(",", crossingFieldValuesList);
+                    featureTarget.set_Value(fieldIndex, fieldValue != string.Empty ? fieldValue : "未穿过居民地面");
                     featureCursorsArray[TargetlyrFlag].UpdateFeature(featureTarget);
                     isModified = true; // 标记已进行字段赋值操作
                 }
@@ -267,7 +290,13 @@ namespace SMGI.Plugin.CartoExt
             }
         }
 
-        // 子函数，获取要素的指定字段值
+        /// <Date>2023/7/28</Date>
+        /// <Author>HaoWong</Author>
+        /// <summary>
+        /// 子函数，获取要素的指定字段值
+        /// </summary>
+        /// <param name="feature"></param>
+        /// <param name="fieldName"></param>
         private string GetFeatureFieldValue(IFeature feature, string fieldName)
         {
             GetFieldIndex(feature, fieldName);
@@ -284,14 +313,25 @@ namespace SMGI.Plugin.CartoExt
             return string.Empty;
         }
 
-        // 子函数，获取要素类中指定字段的索引
+        /// <Date>2023/7/28</Date>
+        /// <Author>HaoWong</Author>
+        /// <summary>
+        /// 子函数，获取要素类中指定字段的索引
+        /// </summary>
+        /// <param name="feature"></param>
+        /// <param name="fieldName"></param>
         private void GetFieldIndex(IFeature feature, string fieldName)
         {
             fieldIndex = feature.Fields.FindField(fieldName);
             return;
         }
 
-        // 子函数，封装释放 IFeatureCursor 资源
+        /// <Date>2023/7/28</Date>
+        /// <Author>HaoWong</Author>
+        /// <summary>
+        /// 子函数，封装释放IFeatureCursor资源
+        /// </summary>
+        /// <param name="cursor"></param>
         private void ReleaseFeatureCursor(IFeatureCursor cursor)
         {
             if (cursor != null)
