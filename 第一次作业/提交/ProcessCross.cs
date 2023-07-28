@@ -46,12 +46,12 @@ namespace SMGI.Plugin.CartoExt
 
         int fieldIndex; // 字段索引
 
-        List<string> crossingFieldValuesList = new List<string>(); // 存储与目标图层穿过的源图层要素字段值的列表作为缓冲区
+        List<string> crossingFieldValuesList = new List<string>(); // 存储与目标图层要素穿过的所有源图层要素所含源字段值组成的列表作为缓冲区
         private string sourceFieldValue; // 源字段值
         private string FutureTargetFieldValue; // 用于填充的目标字段值
         private string currentTargetFieldValue; // 目前的目标字段值
-        int crossingFeatureCount; // 记录穿过目标图层中元素的源图层中元素的数量
-        private IFeatureSelection crossingFeatureSelection; // 记录穿过目标图层中元素的源图层中元素的选择集
+        int crossingFeatureCount; // 记录穿过目标图层中要素的源图层中要素的数量
+        private IFeatureSelection crossingFeatureSelection; // 记录穿过目标图层中要素的源图层中要素的选择集
         bool isModified; // 标记是否进行了赋值操作
 
         /// <Date>2023/7/28</Date>
@@ -154,7 +154,7 @@ namespace SMGI.Plugin.CartoExt
         {
             featureClassesArray = new IFeatureClass[length]; // 初始化要素类数组
             crossingFeatureSelection = (IFeatureSelection)featureLayersArray[TargetlyrFlag]; // 初始化选择集
-            crossingFeatureCount = 0; // 初始化选择元素数量
+            crossingFeatureCount = 0; // 初始化选择要素数量
 
             for (int i = 0; i <= length - 1; i++)
             {
@@ -172,15 +172,15 @@ namespace SMGI.Plugin.CartoExt
                 // 遍历目标图层中的所有要素
                 while (featureTarget != null)
                 {
-                    // 对于该目标图层元素，使用列表存储需要填充到目标字段的源图层元素的源字段值列表
+                    // 对于每个要素，得到需要填充到该要素目标字段的所有源图层要素的源字段值组成的列表
                     GetCrossingFeatureFieldValuesList();
 
-                    // 若列表非空，则该目标图层要素至少穿过一个源图层元素
+                    // 若该列表非空，则该目标图层要素至少穿过一个源图层要素
                     if (crossingFieldValuesList.Count != 0)
                     {
                         FutureTargetFieldValue = string.Join(",", crossingFieldValuesList);
                         crossingFeatureSelection.Add(featureTarget); // 添加到选择集
-                        crossingFeatureCount++; // 穿过元素数量增加
+                        crossingFeatureCount++; // 穿过要素数量增加
                     }
                     else
                     {
@@ -200,10 +200,10 @@ namespace SMGI.Plugin.CartoExt
                 ReleaseFeatureCursor(featureCursorsArray[TargetlyrFlag]);
             }
 
-            // 获取与源图层穿过的目标图层中元素的数量
+            // 获取与源图层穿过的目标图层中要素的数量
             MessageBox.Show(
                 "图层" + featureLayersArray[TargetlyrFlag].Name + "中与图层" + featureLayersArray[SourcelyrFlag].Name +
-                "穿过的元素的总数：" + crossingFeatureCount, "统计数据", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                "穿过的要素的总数：" + crossingFeatureCount, "统计数据", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             // 在循环结束后，只有进行了赋值操作才输出提示信息
             if (isModified)
@@ -224,7 +224,7 @@ namespace SMGI.Plugin.CartoExt
             currentMapControl.Refresh(esriViewDrawPhase.esriViewGeoSelection, null, null);
             MessageBox.Show(
                 "图层" + featureLayersArray[TargetlyrFlag].Name + "中与图层" + featureLayersArray[SourcelyrFlag].Name +
-                "中元素穿过的元素均已被选中", "可视化", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                "中要素穿过的要素均已被选中", "可视化", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
 
@@ -235,7 +235,7 @@ namespace SMGI.Plugin.CartoExt
         /// </summary>
         private void GetCrossingFeatureFieldValuesList()
         {
-            crossingFieldValuesList.Clear(); // 清空存储穿过要素字段值的列表
+            crossingFieldValuesList.Clear(); // 清空列表
 
             // 创建空间过滤器，查找与当前目标图层要素穿过的源图层要素
             ISpatialFilter pSpatialFilter = new SpatialFilterClass
@@ -255,7 +255,7 @@ namespace SMGI.Plugin.CartoExt
                 // 遍历所有与当前目标图层穿过的源图层要素
                 while (pFeatureCross != null)
                 {
-                    // 获取该源图层元素的源字段值
+                    // 获取该源图层要素的源字段值
                     sourceFieldValue = GetFeatureFieldValue(pFeatureCross, featureFieldNamesArray[SourcelyrFlag]);
 
                     // 当该源字段值非空且非重复时
