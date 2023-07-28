@@ -15,6 +15,7 @@ using ESRI.ArcGIS.Geometry;
 using ESRI.ArcGIS.SystemUI;
 using SMGI.Common;
 using ESRI.ArcGIS.DataSourcesFile;
+using Cursor = ESRI.ArcGIS.Geodatabase.Cursor;
 
 namespace SMGI.Plugin.CartoExt
 {
@@ -22,19 +23,16 @@ namespace SMGI.Plugin.CartoExt
     {
         public ProcessCross()
         {
-            m_caption ="ProcessCross"; // 扩展的显示名称
+            m_caption = "ProcessCross"; // 扩展的显示名称
         }
 
         public override bool Enabled
         {
-	        get 
-	        { 
-		         return true;
-	        }
+            get { return true; }
         }
 
         private AxMapControl currentMapControl;
-        private IMap currentMap;    //当前MapControl控件中的Map对象    
+        private IMap currentMap; //当前MapControl控件中的Map对象    
 
         int length; //图层数量
         int SourcelyrFlag = 0; // 源图层标志
@@ -49,6 +47,9 @@ namespace SMGI.Plugin.CartoExt
         int fieldIndex; // 字段索引
 
         List<string> crossingFieldValuesList = new List<string>(); // 存储与目标图层相交的源图层要素字段值的列表作为缓冲区
+        private string sourceFieldValue; // 源字段值
+        private string FutureTargetFieldValue; // 用于填充的目标字段值
+        private string currentTargetFieldValue; // 目前的目标字段值
         int crossingFeatureCount; // 记录穿过目标图层中元素的源图层中元素的数量
         private IFeatureSelection crossingFeatureSelection; // 记录穿过目标图层中元素的源图层中元素的选择集
         bool isModified; // 标记是否进行了赋值操作
@@ -67,31 +68,34 @@ namespace SMGI.Plugin.CartoExt
                 // 检查地图是否为空
                 if (currentMap == null)
                 {
-                    MessageBox.Show("地图未加载，请先加载地图。","错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("地图未加载，请先加载地图。", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
 
                 length = currentMap.LayerCount; // 获取地图图层数量
                 featureLayersArray = new IFeatureLayer[length]; // 初始化要素图层数组
-                featureLayersArray[SourcelyrFlag] = GetFeatureLayerByName(currentMap,"RESA"); // 通过硬编码图层名称获取源图层
-                featureLayersArray[TargetlyrFlag] = GetFeatureLayerByName(currentMap,"LRDL"); // 通过硬编码图层名称获取目标图层
+                featureLayersArray[SourcelyrFlag] = GetFeatureLayerByName(currentMap, "RESA"); // 通过硬编码图层名称获取源图层
+                featureLayersArray[TargetlyrFlag] = GetFeatureLayerByName(currentMap, "LRDL"); // 通过硬编码图层名称获取目标图层
 
                 // 检查是否找到了源图层和目标图层
                 if (featureLayersArray[SourcelyrFlag] == null || featureLayersArray[TargetlyrFlag] == null)
                 {
-                    MessageBox.Show("未找到所需的图层，请确保地图中包含名为"+ featureLayersArray[SourcelyrFlag].Name +"和"+ featureLayersArray[TargetlyrFlag].Name +"的图层。","错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(
+                        "未找到所需的图层，请确保地图中包含名为" + featureLayersArray[SourcelyrFlag].Name + "和" +
+                        featureLayersArray[TargetlyrFlag].Name + "的图层。", "错误", MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
                     return;
                 }
 
                 featureFieldNamesArray = new String[length]; // 初始化要素字段名数组 
-                featureFieldNamesArray[SourcelyrFlag] ="name"; // 通过硬编码设置源图层字段名
-                featureFieldNamesArray[TargetlyrFlag] ="class1"; // 通过硬编码设置目标图层字段名
+                featureFieldNamesArray[SourcelyrFlag] = "name"; // 通过硬编码设置源图层字段名
+                featureFieldNamesArray[TargetlyrFlag] = "class1"; // 通过硬编码设置目标图层字段名
 
                 ProcessCrossing(); // 处理图层穿过操作
             }
             catch (Exception ex)
             {
-                MessageBox.Show("发生错误："+ ex.Message,"错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("发生错误：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -137,6 +141,7 @@ namespace SMGI.Plugin.CartoExt
                         return (IFeatureLayer)map.get_Layer(i);
                 }
             }
+
             return null;
         }
 
@@ -173,8 +178,13 @@ namespace SMGI.Plugin.CartoExt
                     // 在初始化后，根据列表是否为空判断该目标图层要素是否与源图层元素相交
                     if (crossingFieldValuesList.Count != 0)
                     {
+                        FutureTargetFieldValue = string.Join(",", crossingFieldValuesList);
                         crossingFeatureSelection.Add(featureTarget); // 添加到选择集
                         crossingFeatureCount++; // 相交元素数量增加
+                    }
+                    else
+                    {
+                        FutureTargetFieldValue = "未穿过居民地面";
                     }
 
                     // 将列表内容填充到该目标图层要素的目标字段值
@@ -191,23 +201,30 @@ namespace SMGI.Plugin.CartoExt
             }
 
             // 获取与源图层穿过的目标图层中元素的数量
-            MessageBox.Show("图层" + featureLayersArray[TargetlyrFlag].Name + "中与图层" + featureLayersArray[SourcelyrFlag].Name + "穿过的元素的总数：" + crossingFeatureCount, "统计数据", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(
+                "图层" + featureLayersArray[TargetlyrFlag].Name + "中与图层" + featureLayersArray[SourcelyrFlag].Name +
+                "穿过的元素的总数：" + crossingFeatureCount, "统计数据", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             // 在循环结束后，只有进行了赋值操作才输出提示信息
             if (isModified)
             {
                 // 输出字段赋值信息到弹出窗口
-                MessageBox.Show("图层" + featureLayersArray[TargetlyrFlag].Name + "的字段" + featureFieldNamesArray[TargetlyrFlag] + "已被填充", "数据填充情况", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
+                MessageBox.Show(
+                    "图层" + featureLayersArray[TargetlyrFlag].Name + "的字段" + featureFieldNamesArray[TargetlyrFlag] +
+                    "已被填充", "数据填充情况", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             else
             {
-                MessageBox.Show("图层" + featureLayersArray[TargetlyrFlag].Name + "的字段" + featureFieldNamesArray[TargetlyrFlag] + "非空，未进行填充", "数据填充情况", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    "图层" + featureLayersArray[TargetlyrFlag].Name + "的字段" + featureFieldNamesArray[TargetlyrFlag] +
+                    "非空，未进行填充", "数据填充情况", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
 
             // 刷新地图以显示选择集中的要素
             currentMapControl.Refresh(esriViewDrawPhase.esriViewGeoSelection, null, null);
-            MessageBox.Show("图层" + featureLayersArray[TargetlyrFlag].Name + "中与图层" + featureLayersArray[SourcelyrFlag].Name + "中元素穿过的元素均已被选中", "可视化", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(
+                "图层" + featureLayersArray[TargetlyrFlag].Name + "中与图层" + featureLayersArray[SourcelyrFlag].Name +
+                "中元素穿过的元素均已被选中", "可视化", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
 
@@ -239,12 +256,12 @@ namespace SMGI.Plugin.CartoExt
                 while (pFeatureCross != null)
                 {
                     // 获取该源图层元素的源字段值
-                    string fieldValue = GetFeatureFieldValue(pFeatureCross, featureFieldNamesArray[SourcelyrFlag]);
+                    sourceFieldValue = GetFeatureFieldValue(pFeatureCross, featureFieldNamesArray[SourcelyrFlag]);
 
                     // 获取非重复的源字段值添加到列表
-                    if (!string.IsNullOrEmpty(fieldValue) && !crossingFieldValuesList.Contains(fieldValue))
+                    if (!string.IsNullOrEmpty(sourceFieldValue) && !crossingFieldValuesList.Contains(sourceFieldValue))
                     {
-                        crossingFieldValuesList.Add(fieldValue);
+                        crossingFieldValuesList.Add(sourceFieldValue);
                     }
 
                     // 查询下一个与当前目标图层穿过的源图层要素
@@ -261,15 +278,15 @@ namespace SMGI.Plugin.CartoExt
         /// <Date>2023/7/28</Date>
         /// <Author>HaoWong</Author>
         /// <summary>
-        /// 子函数，对于目标图层中的当前要素，赋值其目标字段值
+        /// 子函数，对于目标图层中的当前要素，获取其当前目标字段值，并据此判断是否需要赋值
         /// </summary>
         private void UpdateFeatureFieldValues()
         {
             // 获取当前目标图层要素的目标字段的当前值
-            string currentfieldValue = GetFeatureFieldValue(featureTarget, featureFieldNamesArray[TargetlyrFlag]);
+            currentTargetFieldValue = GetFeatureFieldValue(featureTarget, featureFieldNamesArray[TargetlyrFlag]);
 
             // 检查目标字段当前值是否为空，如果为空则赋值字段
-            if (string.IsNullOrEmpty(currentfieldValue))
+            if (string.IsNullOrEmpty(currentTargetFieldValue))
             {
                 // 获取目标字段的索引
                 GetFieldIndex(featureTarget, featureFieldNamesArray[TargetlyrFlag]);
@@ -278,8 +295,7 @@ namespace SMGI.Plugin.CartoExt
                 if (fieldIndex >= 0)
                 {
                     // 填充目标字段
-                    string fieldValue = string.Join(",", crossingFieldValuesList);
-                    featureTarget.set_Value(fieldIndex, fieldValue != string.Empty ? fieldValue : "未穿过居民地面");
+                    featureTarget.set_Value(fieldIndex, FutureTargetFieldValue);
                     featureCursorsArray[TargetlyrFlag].UpdateFeature(featureTarget);
                     isModified = true; // 标记已进行字段赋值操作
                 }
