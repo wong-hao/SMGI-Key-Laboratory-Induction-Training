@@ -50,9 +50,8 @@ namespace SMGI.Plugin.CartoExt
         private string sourceFieldValue; // 源字段值
         private string FutureTargetFieldValue; // 用于填充的目标字段值
         private string currentTargetFieldValue; // 目前的目标字段值
-        int crossingFeatureCount; // 记录穿过目标图层中要素的源图层中要素的数量
         private IFeatureSelection crossingFeatureSelection; // 记录穿过目标图层中要素的源图层中要素的选择集
-        bool isModified; // 标记是否进行了赋值操作
+        bool isModified; // 标记是否进行了填充操作
 
         /// <Date>2023/7/28</Date>
         /// <Author>HaoWong</Author>
@@ -154,7 +153,6 @@ namespace SMGI.Plugin.CartoExt
         {
             featureClassesArray = new IFeatureClass[length]; // 初始化要素类数组
             crossingFeatureSelection = (IFeatureSelection)featureLayersArray[TargetlyrFlag]; // 初始化选择集
-            crossingFeatureCount = 0; // 初始化选择要素数量
 
             for (int i = 0; i <= length - 1; i++)
             {
@@ -172,22 +170,13 @@ namespace SMGI.Plugin.CartoExt
                 // 遍历目标图层中的所有要素
                 while (featureTarget != null)
                 {
-                    // 对于每个要素，得到需要填充到该要素目标字段的所有源图层要素的源字段值组成的列表
+                    // 对于每个要素，得到需要填充到该要素目标字段的所有源图层要素的源字段值组成的列表作为缓冲区
                     GetCrossingFeatureFieldValuesList();
 
-                    // 若该列表非空，则该目标图层要素至少穿过一个源图层要素
-                    if (crossingFieldValuesList.Count != 0)
-                    {
-                        FutureTargetFieldValue = string.Join(",", crossingFieldValuesList);
-                        crossingFeatureSelection.Add(featureTarget); // 添加到选择集
-                        crossingFeatureCount++; // 穿过要素数量增加
-                    }
-                    else
-                    {
-                        FutureTargetFieldValue = "未穿过居民地面";
-                    }
+                    // 根据缓冲区判断目标图层要素是否穿过源图层要素，并获取填充字段
+                    CheckAndFillCrossing(featureTarget);
 
-                    // 将列表内容填充到该目标图层要素的目标字段值
+                    // 将填充字段填充到该目标图层要素的目标字段值
                     UpdateFeatureFieldValues();
 
                     // 查询目标图层中的下一个要素
@@ -203,12 +192,13 @@ namespace SMGI.Plugin.CartoExt
             // 获取与源图层穿过的目标图层中要素的数量
             MessageBox.Show(
                 "图层" + featureLayersArray[TargetlyrFlag].Name + "中与图层" + featureLayersArray[SourcelyrFlag].Name +
-                "穿过的要素的总数：" + crossingFeatureCount, "统计数据", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                "穿过的要素的总数：" + crossingFeatureSelection.SelectionSet.Count, "统计数据", MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
 
-            // 在循环结束后，只有进行了赋值操作才输出提示信息
+            // 在循环结束后，只有进行了填充操作才输出提示信息
             if (isModified)
             {
-                // 输出字段赋值信息到弹出窗口
+                // 输出字段填充信息到弹出窗口
                 MessageBox.Show(
                     "图层" + featureLayersArray[TargetlyrFlag].Name + "的字段" + featureFieldNamesArray[TargetlyrFlag] +
                     "已被填充", "数据填充情况", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -258,7 +248,7 @@ namespace SMGI.Plugin.CartoExt
                     // 获取该源图层要素的源字段值
                     sourceFieldValue = GetFeatureFieldValue(pFeatureCross, featureFieldNamesArray[SourcelyrFlag]);
 
-                    // 当该源字段值非空且非重复时
+                    // 确保该源字段值非空，且非重复以避免统计冗余
                     if (!string.IsNullOrEmpty(sourceFieldValue) && !crossingFieldValuesList.Contains(sourceFieldValue))
                     {
                         // 将其添加到列表
@@ -276,17 +266,36 @@ namespace SMGI.Plugin.CartoExt
             }
         }
 
+        /// <Date>2023/7/29</Date>
+        /// <Author>HaoWong</Author>
+        /// <summary>
+        /// 子函数，根据列表缓冲区获取填充字段
+        /// </summary>
+        private void CheckAndFillCrossing(IFeature targetFeature)
+        {
+            if (crossingFieldValuesList.Count != 0)
+            {
+                FutureTargetFieldValue = string.Join(",", crossingFieldValuesList);
+                crossingFeatureSelection.Add(targetFeature); // 添加到选择集
+            }
+            else
+            {
+                FutureTargetFieldValue = "未穿过居民地面";
+            }
+        }
+
+
         /// <Date>2023/7/28</Date>
         /// <Author>HaoWong</Author>
         /// <summary>
-        /// 子函数，对于目标图层中的当前要素，获取其当前目标字段值，并据此判断是否需要赋值
+        /// 子函数，对于目标图层中的当前要素，获取其当前目标字段值，并据此将填充字段填充至目标字段
         /// </summary>
         private void UpdateFeatureFieldValues()
         {
             // 获取当前目标图层要素的目标字段的当前值
             currentTargetFieldValue = GetFeatureFieldValue(featureTarget, featureFieldNamesArray[TargetlyrFlag]);
 
-            // 检查目标字段当前值是否为空，如果为空则赋值字段
+            // 检查当前值是否为空，如果为空则填充字段
             if (string.IsNullOrEmpty(currentTargetFieldValue))
             {
                 // 获取目标字段的索引
@@ -298,12 +307,12 @@ namespace SMGI.Plugin.CartoExt
                     // 填充目标字段
                     featureTarget.set_Value(fieldIndex, FutureTargetFieldValue);
                     featureCursorsArray[TargetlyrFlag].UpdateFeature(featureTarget);
-                    isModified = true; // 标记已进行字段赋值操作
+                    isModified = true; // 标记已进行字段填充操作
                 }
             }
             else
             {
-                isModified = false; // 目标字段非空，无需赋值
+                isModified = false; // 目标字段非空，无需填充
             }
         }
 
@@ -324,7 +333,7 @@ namespace SMGI.Plugin.CartoExt
                 // 根据字段索引获取到字段值
                 object fieldValueObj = feature.get_Value(fieldIndex);
 
-                // 判断是否为空
+                // 对获取到的字段值进行判空处理
                 if (fieldValueObj != null && fieldValueObj != DBNull.Value)
                 {
                     return fieldValueObj.ToString();
