@@ -106,7 +106,12 @@ namespace SMGI.Plugin.CartoExt
         private void GetCurrentMap()
         {
             currentMapControl = m_Application.MapControl;
-            currentMap = currentMapControl.Map;
+
+            // 确保当前地图控件和地图对象不为空
+            if (currentMapControl != null)
+            {
+                currentMap = currentMapControl.Map;
+            }
         }
 
         /// <Date>2023/7/28</Date>
@@ -328,6 +333,7 @@ namespace SMGI.Plugin.CartoExt
             // 根据字段名获取到字段索引
             GetFieldIndex(feature, fieldName);
 
+            // 若索引非空
             if (fieldIndex >= 0)
             {
                 // 根据字段索引获取到字段值
@@ -353,7 +359,6 @@ namespace SMGI.Plugin.CartoExt
         private void GetFieldIndex(IFeature feature, string fieldName)
         {
             fieldIndex = feature.Fields.FindField(fieldName);
-            return;
         }
 
         /// <Date>2023/7/28</Date>
