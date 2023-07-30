@@ -191,10 +191,10 @@ namespace SMGI.Plugin.CartoExt
                 featureClassesArray[i] = featureLayersArray[i].FeatureClass;
             }
 
-            // 遍历目标图层要素并处理穿过情况
+            // 初始化游标集合
             featureCursorsArray = new IFeatureCursor[length];
 
-            // 存储目标图层中所有与当前源图层要素穿过的要素的游标
+            // 存储目标图层中所有要素的游标
             featureCursorsArray[TargetlyrFlag] = featureClassesArray[TargetlyrFlag].Update(null, false);
 
             try
