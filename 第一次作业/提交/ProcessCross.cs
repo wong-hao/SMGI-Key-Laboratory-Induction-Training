@@ -75,10 +75,8 @@ namespace SMGI.Plugin.CartoExt
                     return;
                 }
 
-                length = currentMap.LayerCount; // 获取地图图层数量
-                featureLayersArray = new IFeatureLayer[length]; // 初始化要素图层数组
-                featureLayersArray[SourcelyrFlag] = GetFeatureLayerByName(currentMap, SourceLayerName); // 通过硬编码图层名称获取源图层
-                featureLayersArray[TargetlyrFlag] = GetFeatureLayerByName(currentMap, TargetLayerName); // 通过硬编码图层名称获取目标图层
+                // 初始化要素图层数组
+                GetFeatureLayersArray();
 
                 // 检查是否找到了源图层和目标图层
                 if (featureLayersArray[SourcelyrFlag] == null || featureLayersArray[TargetlyrFlag] == null)
@@ -90,11 +88,11 @@ namespace SMGI.Plugin.CartoExt
                     return;
                 }
 
-                featureFieldNamesArray = new String[length]; // 初始化要素字段名数组 
-                featureFieldNamesArray[SourcelyrFlag] = "name"; // 通过硬编码设置源图层字段名
-                featureFieldNamesArray[TargetlyrFlag] = "class1"; // 通过硬编码设置目标图层字段名
+                // 初始化要素字段名数组
+                InitializeFeatureFieldNamesArray();
 
-                ProcessCrossing(); // 处理图层穿过操作
+                // 处理图层穿过操作
+                ProcessCrossing(); 
             }
             catch (Exception ex)
             {
@@ -116,6 +114,31 @@ namespace SMGI.Plugin.CartoExt
             {
                 currentMap = currentMapControl.Map;
             }
+        }
+
+        /// <Date>2023/7/30</Date>
+        /// <Author>HaoWong</Author>
+        /// <summary>
+        /// 子函数，得到要素图层数组
+        /// </summary>
+        private void GetFeatureLayersArray()
+        {
+            length = currentMap.LayerCount; // 获取地图图层数量
+            featureLayersArray = new IFeatureLayer[length]; // 初始化要素图层数组
+            featureLayersArray[SourcelyrFlag] = GetFeatureLayerByName(currentMap, SourceLayerName); // 通过硬编码图层名称获取源图层
+            featureLayersArray[TargetlyrFlag] = GetFeatureLayerByName(currentMap, TargetLayerName); // 通过硬编码图层名称获取目标图层
+        }
+
+        /// <Date>2023/7/30</Date>
+        /// <Author>HaoWong</Author>
+        /// <summary>
+        /// 子函数，初始化要素字段名数组
+        /// </summary>
+        private void InitializeFeatureFieldNamesArray()
+        {
+            featureFieldNamesArray = new String[length]; // 初始化要素字段名数组 
+            featureFieldNamesArray[SourcelyrFlag] = "name"; // 通过硬编码设置源图层字段名
+            featureFieldNamesArray[TargetlyrFlag] = "class1"; // 通过硬编码设置目标图层字段名
         }
 
         /// <Date>2023/7/28</Date>
