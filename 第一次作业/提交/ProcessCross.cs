@@ -44,7 +44,8 @@ namespace SMGI.Plugin.CartoExt
         static IFeatureLayer[] featureLayersArray; // 存储要素图层的数组
         static IFeatureClass[] featureClassesArray; // 存储要素类的数组
         static IFeatureCursor[] featureCursorsArray; // 存储要素游标的数组
-        IFeature featureTarget; // 存储目标要素
+        private IFeature featureSource; // 存储源图层要素
+        private IFeature featureTarget; // 存储目标图层要素
         static String[] featureFieldNamesArray; // 存储要素字段名的数组
 
         int fieldIndex; // 字段索引
@@ -169,11 +170,14 @@ namespace SMGI.Plugin.CartoExt
 
             // 遍历目标图层要素并处理穿过情况
             featureCursorsArray = new IFeatureCursor[length];
+
+            // 存储目标图层中与当前源图层要素穿过的要素的游标
             featureCursorsArray[TargetlyrFlag] = featureClassesArray[TargetlyrFlag].Update(null, false);
 
             try
             {
-                featureTarget = featureCursorsArray[TargetlyrFlag].NextFeature(); // 获取目标图层中的第一个要素，用以初始化遍历循环
+                // 获取目标图层中的第一个要素，用以初始化遍历循环
+                featureTarget = featureCursorsArray[TargetlyrFlag].NextFeature();
 
                 // 遍历目标图层中的所有要素
                 while (featureTarget != null)
@@ -242,19 +246,19 @@ namespace SMGI.Plugin.CartoExt
                 SpatialRel = esriSpatialRelEnum.esriSpatialRelCrosses // 设置空间关系为穿过
             };
 
-            // 使用游标遍历与当前目标图层要素穿过的源图层要素
+            // 存储源图层中与当前目标图层要素穿过的要素的游标
             featureCursorsArray[SourcelyrFlag] = featureClassesArray[SourcelyrFlag].Search(pSpatialFilter, false);
-
-            // 查询第一个与当前目标图层穿过的源图层要素，用以初始化遍历循环
-            IFeature pFeatureCross = featureCursorsArray[SourcelyrFlag].NextFeature();
 
             try
             {
+                // 查询第一个与当前目标图层穿过的源图层要素，用以初始化遍历循环
+                featureSource = featureCursorsArray[SourcelyrFlag].NextFeature();
+
                 // 遍历所有与当前目标图层穿过的源图层要素
-                while (pFeatureCross != null)
+                while (featureSource != null)
                 {
                     // 获取该源图层要素的源字段值
-                    sourceFieldValue = GetFeatureFieldValue(pFeatureCross, featureFieldNamesArray[SourcelyrFlag]);
+                    sourceFieldValue = GetFeatureFieldValue(featureSource, featureFieldNamesArray[SourcelyrFlag]);
 
                     // 确保该源字段值非空，且非重复以避免统计冗余
                     if (!string.IsNullOrEmpty(sourceFieldValue) && !featureFieldValueBuffer.Contains(sourceFieldValue))
@@ -264,7 +268,7 @@ namespace SMGI.Plugin.CartoExt
                     }
 
                     // 查询下一个与当前目标图层穿过的源图层要素
-                    pFeatureCross = featureCursorsArray[SourcelyrFlag].NextFeature();
+                    featureSource = featureCursorsArray[SourcelyrFlag].NextFeature();
                 }
             }
             finally
