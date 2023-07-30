@@ -34,6 +34,9 @@ namespace SMGI.Plugin.CartoExt
         private AxMapControl currentMapControl;
         private IMap currentMap; //当前MapControl控件中的Map对象    
 
+        private static readonly string SourceLayerName = "RESA"; // 源图层名
+        private static readonly string TargetLayerName = "LRDL"; // 目标图层名
+
         int length; //图层数量
         int SourcelyrFlag = 0; // 源图层标志
         int TargetlyrFlag = 1; // 目标图层标志
@@ -46,7 +49,7 @@ namespace SMGI.Plugin.CartoExt
 
         int fieldIndex; // 字段索引
 
-        List<string> crossingFieldValuesList = new List<string>(); // 存储与目标图层要素穿过的所有源图层要素所含源字段值组成的列表作为缓冲区
+        List<string> featureFieldValueBuffer = new List<string>(); // 存储与目标图层要素穿过的所有源图层要素所含源字段值组成的列表作为缓冲区
         private string sourceFieldValue; // 源字段值
         private string FutureTargetFieldValue; // 用于填充的目标字段值
         private string currentTargetFieldValue; // 目前的目标字段值
@@ -73,8 +76,8 @@ namespace SMGI.Plugin.CartoExt
 
                 length = currentMap.LayerCount; // 获取地图图层数量
                 featureLayersArray = new IFeatureLayer[length]; // 初始化要素图层数组
-                featureLayersArray[SourcelyrFlag] = GetFeatureLayerByName(currentMap, "RESA"); // 通过硬编码图层名称获取源图层
-                featureLayersArray[TargetlyrFlag] = GetFeatureLayerByName(currentMap, "LRDL"); // 通过硬编码图层名称获取目标图层
+                featureLayersArray[SourcelyrFlag] = GetFeatureLayerByName(currentMap, SourceLayerName); // 通过硬编码图层名称获取源图层
+                featureLayersArray[TargetlyrFlag] = GetFeatureLayerByName(currentMap, TargetLayerName); // 通过硬编码图层名称获取目标图层
 
                 // 检查是否找到了源图层和目标图层
                 if (featureLayersArray[SourcelyrFlag] == null || featureLayersArray[TargetlyrFlag] == null)
@@ -176,10 +179,10 @@ namespace SMGI.Plugin.CartoExt
                 while (featureTarget != null)
                 {
                     // 对于每个要素，得到需要填充到该要素目标字段的所有源图层要素的源字段值组成的列表作为缓冲区
-                    GetCrossingFeatureFieldValuesList();
+                    GetFeatureFieldValuesBuffer();
 
                     // 根据缓冲区判断目标图层要素是否穿过源图层要素，并获取填充字段
-                    CheckAndFillCrossing(featureTarget);
+                    GetFeatureFieldValues(featureTarget);
 
                     // 将填充字段填充到该目标图层要素的目标字段值
                     UpdateFeatureFieldValues();
@@ -226,11 +229,11 @@ namespace SMGI.Plugin.CartoExt
         /// <Date>2023/7/28</Date>
         /// <Author>HaoWong</Author>
         /// <summary>
-        /// 子函数，对于目标图层中的单个要素，获取其穿过的源图层中的所有要素的源字段值组成的列表
+        /// 子函数，对于目标图层中的单个要素，获取其穿过的源图层中的所有要素的源字段值组成的缓冲区
         /// </summary>
-        private void GetCrossingFeatureFieldValuesList()
+        private void GetFeatureFieldValuesBuffer()
         {
-            crossingFieldValuesList.Clear(); // 清空列表
+            featureFieldValueBuffer.Clear(); // 清空缓冲区
 
             // 创建空间过滤器，查找与当前目标图层要素穿过的源图层要素
             ISpatialFilter pSpatialFilter = new SpatialFilterClass
@@ -254,10 +257,10 @@ namespace SMGI.Plugin.CartoExt
                     sourceFieldValue = GetFeatureFieldValue(pFeatureCross, featureFieldNamesArray[SourcelyrFlag]);
 
                     // 确保该源字段值非空，且非重复以避免统计冗余
-                    if (!string.IsNullOrEmpty(sourceFieldValue) && !crossingFieldValuesList.Contains(sourceFieldValue))
+                    if (!string.IsNullOrEmpty(sourceFieldValue) && !featureFieldValueBuffer.Contains(sourceFieldValue))
                     {
-                        // 将其添加到列表
-                        crossingFieldValuesList.Add(sourceFieldValue);
+                        // 将其添加到缓冲区
+                        featureFieldValueBuffer.Add(sourceFieldValue);
                     }
 
                     // 查询下一个与当前目标图层穿过的源图层要素
@@ -274,13 +277,14 @@ namespace SMGI.Plugin.CartoExt
         /// <Date>2023/7/29</Date>
         /// <Author>HaoWong</Author>
         /// <summary>
-        /// 子函数，根据列表缓冲区获取填充字段
+        /// 子函数，根据缓冲区获取填充字段
         /// </summary>
-        private void CheckAndFillCrossing(IFeature targetFeature)
+        private void GetFeatureFieldValues(IFeature targetFeature)
         {
-            if (crossingFieldValuesList.Count != 0)
+            // 缓冲区非空时，至少有一个源图层要素与当前目标图层要素穿过
+            if (featureFieldValueBuffer.Count != 0)
             {
-                FutureTargetFieldValue = string.Join(",", crossingFieldValuesList);
+                FutureTargetFieldValue = string.Join(",", featureFieldValueBuffer);
                 crossingFeatureSelection.Add(targetFeature); // 添加到选择集
             }
             else
@@ -288,7 +292,6 @@ namespace SMGI.Plugin.CartoExt
                 FutureTargetFieldValue = "未穿过居民地面";
             }
         }
-
 
         /// <Date>2023/7/28</Date>
         /// <Author>HaoWong</Author>
