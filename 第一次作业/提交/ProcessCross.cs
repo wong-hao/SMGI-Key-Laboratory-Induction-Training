@@ -171,7 +171,7 @@ namespace SMGI.Plugin.CartoExt
             // 遍历目标图层要素并处理穿过情况
             featureCursorsArray = new IFeatureCursor[length];
 
-            // 存储目标图层中与当前源图层要素穿过的要素的游标
+            // 存储目标图层中所有与当前源图层要素穿过的要素的游标
             featureCursorsArray[TargetlyrFlag] = featureClassesArray[TargetlyrFlag].Update(null, false);
 
             try
@@ -186,7 +186,7 @@ namespace SMGI.Plugin.CartoExt
                     GetFeatureFieldValuesBuffer();
 
                     // 根据缓冲区判断目标图层要素是否穿过源图层要素，并获取填充字段
-                    GetFeatureFieldValues(featureTarget);
+                    GetFeatureFieldValues();
 
                     // 将填充字段填充到该目标图层要素的目标字段值
                     UpdateFeatureFieldValues();
@@ -246,7 +246,7 @@ namespace SMGI.Plugin.CartoExt
                 SpatialRel = esriSpatialRelEnum.esriSpatialRelCrosses // 设置空间关系为穿过
             };
 
-            // 存储源图层中与当前目标图层要素穿过的要素的游标
+            // 存储源图层中所有与当前目标图层要素穿过的要素的游标
             featureCursorsArray[SourcelyrFlag] = featureClassesArray[SourcelyrFlag].Search(pSpatialFilter, false);
 
             try
@@ -283,13 +283,13 @@ namespace SMGI.Plugin.CartoExt
         /// <summary>
         /// 子函数，根据缓冲区获取填充字段
         /// </summary>
-        private void GetFeatureFieldValues(IFeature targetFeature)
+        private void GetFeatureFieldValues()
         {
             // 缓冲区非空时，至少有一个源图层要素与当前目标图层要素穿过
             if (featureFieldValueBuffer.Count != 0)
             {
                 FutureTargetFieldValue = string.Join(",", featureFieldValueBuffer);
-                crossingFeatureSelection.Add(targetFeature); // 添加到选择集
+                crossingFeatureSelection.Add(featureTarget); // 添加到选择集
             }
             else
             {
