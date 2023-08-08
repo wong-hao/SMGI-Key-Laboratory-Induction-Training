@@ -7,35 +7,40 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 using ESRI.ArcGIS.Carto;
+using ESRI.ArcGIS.Controls;
+using ESRI.ArcGIS.Geodatabase;
+using ESRI.ArcGIS.SystemUI;
 
 namespace SMGI.Plugin.CartoExt
 {
     public partial class FrmLayerResult : Form
     {
         public IMap currentMap;    //当前MapControl控件中的Map对象
+        public AxMapControl currentMapControl;
+
+        public IFeatureLayer TargetFeatureLayer;
 
         public FrmLayerResult()
         {
             InitializeComponent();
         }
 
-        /// <summary>
-        /// 获得当前MapControl控件中的Map对象。
-        /// </summary>
-        public IMap CurrentMap
+
+        private bool check()
         {
-            get { return currentMap; }
-            set { currentMap = value; }
+            if (cmbSelLayerName.SelectedIndex == -1)
+            {
+                MessageBox.Show("请选择图层！", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return false;
+            }
+            return true;
         }
 
         public void initUI()
         {
             try
             {
-                //将当前图层列表清空
-                cmbSelLayerName.Items.Clear();
-
-                string layerName;   //设置临时变量存储图层名称
+                string layerName; //设置临时变量存储图层名称
 
                 //对Map中的每个图层进行判断并加载名称
                 for (int i = 0; i < currentMap.LayerCount; i++)
@@ -60,10 +65,82 @@ namespace SMGI.Plugin.CartoExt
                     }
                 }
 
-                //将控件的默认选项设置为第一个图层的名称
-                cmbSelLayerName.SelectedIndex = 0;
+                //将控件的默认选项设置为空
+                cmbSelLayerName.SelectedIndex = -1;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+        //在图层名称下拉框控件中所选择图层发生改变时触发事件，执行本函数
+        private void cmbSelLayerName_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            for (int i = 0; i < currentMap.LayerCount; i++)
+            {
+                if (currentMap.get_Layer(i) is GroupLayer)
+                {
+                    ICompositeLayer compositeLayer = currentMap.get_Layer(i) as ICompositeLayer;
+                    for (int j = 0; j < compositeLayer.Count; j++)
+                    {
+                        //判断图层的名称是否与控件中选择的图层名称相同
+                        if (compositeLayer.get_Layer(j).Name == cmbSelLayerName.SelectedItem.ToString())
+                        {
+                            //如果相同则设置为整个窗体所使用的IFeatureLayer接口对象
+                            TargetFeatureLayer = compositeLayer.get_Layer(j) as IFeatureLayer;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    //判断图层的名称是否与控件中选择的图层名称相同
+                    if (currentMap.get_Layer(i).Name == cmbSelLayerName.SelectedItem.ToString())
+                    {
+                        //如果相同则设置为整个窗体所使用的IFeatureLayer接口对象
+                        TargetFeatureLayer = currentMap.get_Layer(i) as IFeatureLayer;
+                        break;
+                    }
+                }
+            }
+        }
+
+        private void button_ok_Click(object sender, EventArgs e)
+        {
+            if (!check()) return;
+
+            cmbSelLayerName.Items.Clear();
+            cmbSelLayerName.Text = "";
+            MessageBox.Show("选择的图层为" + TargetFeatureLayer.Name);
+
+            // 创建 MainForm 实例
+            //MainForm mainForm = new MainForm();
+
+            // 通过属性给 MainForm 的 TargetFeatureLayer 赋值
+            //mainForm.TargetFeatureLayer = TargetFeatureLayer;
+
+
+            Close();
+
+        }
+
+        private void button_cancel_Click(object sender, EventArgs e)
+        {
+            Close();
+        }
+
+        private void FrmLayerResult_Load(object sender, EventArgs e)
+        {
+            try
+            {
+                //将当前图层列表清空
+                cmbSelLayerName.Items.Clear();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
         }
     }
 }

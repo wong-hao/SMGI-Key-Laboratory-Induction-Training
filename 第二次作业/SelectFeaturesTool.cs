@@ -73,7 +73,15 @@ namespace SMGI.Plugin.CartoExt
 
         public override void OnClick()
         {
+            // 获取当前地图
             GetCurrentMap();
+
+            // 检查地图是否为空
+            if (currentMap == null)
+            {
+                MessageBox.Show("地图未加载，请先加载地图。", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
 
             //打开提示框
             showResultForm();
@@ -109,6 +117,7 @@ namespace SMGI.Plugin.CartoExt
 
                     _frmLayerResult.Show();
                     _frmLayerResult.currentMap = currentMap;
+                    _frmLayerResult.currentMapControl = currentMapControl;
                     _frmLayerResult.initUI();
                     //_frmLayerResult.ShowDialog();
                 }
