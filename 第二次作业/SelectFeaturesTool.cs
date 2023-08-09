@@ -1,66 +1,55 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using SMGI.Common;
+using System.Windows.Forms;
 using ESRI.ArcGIS.Carto;
 using ESRI.ArcGIS.Controls;
-using System.Windows.Forms;
-using ESRI.ArcGIS.Geometry;
 using ESRI.ArcGIS.Display;
 using ESRI.ArcGIS.Geodatabase;
-using ESRI.ArcGIS.esriSystem;
+using ESRI.ArcGIS.Geometry;
+using SMGI.Common;
 
 namespace SMGI.Plugin.CartoExt
 {
     public class SelectFeaturesTool : SMGITool
     {
-        private AxMapControl currentMapControl;
-        private IMap currentMap; //当前MapControl控件中的Map对象   
-        private IRubberBand pRubberBand = new RubberPolygonClass();
-        private IGeometry geometry;
-        private IFeatureSelection featureSelection;
-        private IFeature SelectedLineFeature;
-        private int divideCount = 0;
+        /// <summary>
+        ///     测量结果显示对话框
+        /// </summary>
+        private FrmLayerResult _frmLayerResult;
 
         /// <summary>
-        /// 测量结果显示对话框
+        ///     点集
         /// </summary>
-        FrmLayerResult _frmLayerResult;
+        private IPointCollection _ptCollection;
 
-        /// <summary>
-        /// 点集
-        /// </summary>
-        IPointCollection _ptCollection;
+        private IMap currentMap; // 当前MapControl控件中的Map对象   
+        private AxMapControl currentMapControl; // 当前的MapControl控件
+        private int divideCount; // 等分的份数
+        private IFeatureSelection featureSelection; // 选择集
+        private IGeometry geometry; // 框选出的几何图形
+        private readonly IRubberBand pRubberBand = new RubberPolygonClass(); // 用于框选面要素
+        private IFeature SelectedLineFeature; // 用于等分的线要素
 
         public SelectFeaturesTool()
         {
-            m_caption = "测量工具";      
+            m_caption = "参数设置";
         }
 
         public override bool Enabled
         {
-            get
-            {
-                return true;
-            }
+            get { return true; }
         }
 
         /// <Date>2023/8/4</Date>
         /// <Author>HaoWong</Author>
         /// <summary>
-        /// 子函数，得到目前图层
+        ///     子函数，得到目前图层
         /// </summary>
         private void GetCurrentMap()
         {
             currentMapControl = m_Application.MapControl;
 
             // 确保当前地图控件和地图对象不为空
-            if (currentMapControl != null)
-            {
-                currentMap = currentMapControl.Map;
-            }
+            if (currentMapControl != null) currentMap = currentMapControl.Map;
         }
 
         public override void OnClick()
@@ -79,7 +68,14 @@ namespace SMGI.Plugin.CartoExt
             showResultForm();
         }
 
-        private void PerformMultipleSelection()
+        // 刷新地图
+        private void RefreshMap()
+        {
+            currentMapControl.Refresh(esriViewDrawPhase.esriViewGeoSelection, null, null);
+        }
+
+        // 拉框选择
+        private void TrackGeometry()
         {
             geometry = pRubberBand.TrackNew(currentMapControl.ActiveView.ScreenDisplay, null);
             if (geometry != null && !geometry.IsEmpty)
@@ -89,24 +85,26 @@ namespace SMGI.Plugin.CartoExt
                 spatialFilter.SpatialRel = esriSpatialRelEnum.esriSpatialRelIntersects;
                 featureSelection.SelectFeatures(spatialFilter, esriSelectionResultEnum.esriSelectionResultAdd, false);
             }
+
+            // 刷新地图显示
+            RefreshMap();
         }
 
+        // 【ctrl】键按下：实现多选（现有选择集不清空）
+        private void PerformMultipleSelection()
+        {
+            TrackGeometry();
+        }
+
+        // 【ctrl】没有按下：清空选择集，在根据拉框绘制的多边形重新创建选择集
         private void PerformClearAndSelection()
         {
-            // 清空选择集
-            featureSelection.Clear();
+            ClearResources();
 
-            // 根据拉框绘制的多边形重新创建选择集
-            geometry = pRubberBand.TrackNew(currentMapControl.ActiveView.ScreenDisplay, null);
-            if (geometry != null && !geometry.IsEmpty)
-            {
-                ISpatialFilter spatialFilter = new SpatialFilter();
-                spatialFilter.Geometry = geometry;
-                spatialFilter.SpatialRel = esriSpatialRelEnum.esriSpatialRelIntersects;
-                featureSelection.SelectFeatures(spatialFilter, esriSelectionResultEnum.esriSelectionResultNew, false);
-            }
+            TrackGeometry();
         }
 
+        // 根据选择集中线要素个数进行动态判断
         private void PerformRightClickAction()
         {
             try
@@ -114,16 +112,17 @@ namespace SMGI.Plugin.CartoExt
                 if (featureSelection.SelectionSet.Count == 0)
                 {
                     MessageBox.Show("请先选择单个线要素");
-                    clearResources();
+                    ClearResources();
                     return;
                 }
-                else if (featureSelection.SelectionSet.Count == 1)
+
+                if (featureSelection.SelectionSet.Count == 1)
                 {
                     SelectedLineFeature = GetSelectedLineFeature(featureSelection);
 
                     if (SelectedLineFeature == null)
                     {
-                        clearResources();
+                        ClearResources();
                         return;
                     }
 
@@ -132,14 +131,12 @@ namespace SMGI.Plugin.CartoExt
                     MessageBox.Show("线段已等分为" + divideCount + "份");
 
                     // 刷新地图显示
-                    currentMapControl.Refresh(esriViewDrawPhase.esriViewGeoSelection, null, null);
-
+                    RefreshMap();
                 }
                 else if (featureSelection.SelectionSet.Count > 1)
                 {
                     MessageBox.Show("请先选择单个线要素");
-                    clearResources();
-                    return;
+                    ClearResources();
                 }
             }
             catch (Exception ex)
@@ -151,9 +148,8 @@ namespace SMGI.Plugin.CartoExt
 
         public override void OnMouseDown(int button, int shift, int x, int y)
         {
-
             // 确保选定了一个要素图层
-            IFeatureLayer selectedLayer = _frmLayerResult.TargetFeatureLayer;
+            var selectedLayer = _frmLayerResult.TargetFeatureLayer;
             if (selectedLayer != null)
             {
                 if (_frmLayerResult.TargetFeatureLayer == null)
@@ -165,85 +161,70 @@ namespace SMGI.Plugin.CartoExt
                 featureSelection = selectedLayer as IFeatureSelection;
 
                 if (button == 1) // 鼠标左键按下
-                {
                     try
                     {
                         if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
-                        {
                             // 弹出确认对话框
-                            DialogResult result = MessageBox.Show("已按住Control键，是否继续进行选择操作？", "确认", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                            
-                            if (result == DialogResult.No) return;
-
+                            //DialogResult result = MessageBox.Show("已按住Control键，是否继续进行选择操作？", "确认", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                            //if (result == DialogResult.No) return;
                             PerformMultipleSelection();
-                        }
                         else
-                        {
                             PerformClearAndSelection();
-                        }
 
                         if (featureSelection.SelectionSet.Count != 0)
-                        {
-                            MessageBox.Show("已选中" + featureSelection.SelectionSet.Count + "个" + selectedLayer.FeatureClass.ShapeType + "元素");
-                        }
+                            MessageBox.Show("选择集中存在" + featureSelection.SelectionSet.Count + "个" +
+                                            selectedLayer.FeatureClass.ShapeType + "元素");
                         else
-                        {
-                            MessageBox.Show("未选中任何与图层" + _frmLayerResult.TargetFeatureLayer.Name + "类型匹配的元素");
-                        }
-
+                            MessageBox.Show("选择集中不存在任何与图层" + _frmLayerResult.TargetFeatureLayer.Name + "图形类型匹配的元素");
                     }
                     catch (Exception ex)
                     {
                         MessageBox.Show(ex.ToString());
                         throw;
                     }
-                    // 右键按下
-                }
-                else if (button == 2)
-                {
-                    PerformRightClickAction();
-                }
+                // 右键按下
+                else if (button == 2) PerformRightClickAction();
             }
         }
 
         public override void OnMouseMove(int button, int shift, int x, int y)
         {
-          
         }
 
         public void ExitTool()
         {
             currentMapControl.CurrentTool = null;
 
-            clearResources();
+            ClearResources();
 
             MessageBox.Show("工具已退出");
         }
 
         public override void OnDblClick()
         {
-            
         }
 
+        // 弹出窗体
         private void ShowSelectionInTreeView()
         {
             // 检查选择集是否有要素
-            if (featureSelection != null && featureSelection.SelectionSet != null && featureSelection.SelectionSet.Count > 0)
+            if (featureSelection != null && featureSelection.SelectionSet != null &&
+                featureSelection.SelectionSet.Count > 0)
             {
                 // 创建一个窗体
-                Form selectionForm = new Form();
+                var selectionForm = new Form();
                 selectionForm.Text = "选择集中的要素";
 
                 // 创建 TreeView 控件
-                TreeView treeView = new TreeView();
+                var treeView = new TreeView();
                 treeView.Dock = DockStyle.Fill;
 
                 // 遍历选择集中的要素，将每个 OID 添加为节点
-                IEnumIDs enumIDs = featureSelection.SelectionSet.IDs;
+                var enumIDs = featureSelection.SelectionSet.IDs;
                 int oid;
                 while ((oid = enumIDs.Next()) != -1)
                 {
-                    TreeNode node = new TreeNode("OID: " + oid.ToString());
+                    var node = new TreeNode("OID: " + oid);
                     treeView.Nodes.Add(node);
                 }
 
@@ -265,39 +246,32 @@ namespace SMGI.Plugin.CartoExt
         {
             base.OnKeyDown(keyCode, shift);
 
-            if ((shift & (int)Keys.Control) != 0)
+            if (keyCode == (int)Keys.Space) // 按下的是空格键
             {
-                MessageBox.Show("Control");
-
-            }else if (keyCode == (int)Keys.Space) // 按下的是空格键
-            {
-                if (featureSelection != null && featureSelection.SelectionSet.Count > 0)
-                {
-                    ShowSelectionInTreeView();
-                }
+                if (featureSelection != null && featureSelection.SelectionSet.Count > 0) ShowSelectionInTreeView();
             }
             else if (keyCode == (int)Keys.Escape) // 按下的是 ESC 键
             {
                 MessageBox.Show("退出工具");
-                ExitTool(); // 退出工具
+
+                // 退出工具
+                ExitTool();
             }
         }
 
-        public void clearResources()
+        // 清空资源
+        public void ClearResources()
         {
             // 清空选择集
-            if (featureSelection != null)
-            {
-                featureSelection.Clear();
-            }
+            if (featureSelection != null) featureSelection.Clear();
 
             // 刷新地图显示
-            currentMapControl.Refresh(esriViewDrawPhase.esriViewGeoSelection, null, null);
+            RefreshMap();
         }
 
 
         /// <summary>
-        /// 显示结果框
+        ///     显示窗体
         /// </summary>
         private void showResultForm()
         {
@@ -325,66 +299,65 @@ namespace SMGI.Plugin.CartoExt
             }
         }
 
+        // 获取选择集中的线要素
         public IFeature GetSelectedLineFeature(IFeatureSelection featureSelection)
         {
-            ISelectionSet selectionSet = featureSelection.SelectionSet;
+            var selectionSet = featureSelection.SelectionSet;
 
 
-                ICursor cursor;
-                selectionSet.Search(null, false, out cursor);
+            ICursor cursor;
+            selectionSet.Search(null, false, out cursor);
 
-                IFeatureCursor featureCursor = cursor as IFeatureCursor;
-                if (featureCursor != null)
+            var featureCursor = cursor as IFeatureCursor;
+            if (featureCursor != null)
+            {
+                var selectedFeature = featureCursor.NextFeature();
+                if (selectedFeature.Shape.GeometryType == esriGeometryType.esriGeometryPolyline)
                 {
-                    IFeature selectedFeature = featureCursor.NextFeature();
-                    if (selectedFeature.Shape.GeometryType == esriGeometryType.esriGeometryPolyline)
-                    {
-                        MessageBox.Show("已获取被选中的唯一一个线要素");
-                        return selectedFeature; // 返回唯一的线要素
-                    }
-                    else
-                    {
-                        MessageBox.Show("被选中的唯一一个要素为"+selectedFeature.Shape.GeometryType + ", 并非线要素，请重新选择!");
-                        clearResources();
-                        return null;
-                    }
+                    MessageBox.Show("已获取被选中的唯一一个线要素");
+                    return selectedFeature; // 返回唯一的线要素
                 }
 
+                MessageBox.Show("被选中的唯一一个要素为" + selectedFeature.Shape.GeometryType + ", 并非线要素，请重新选择!");
+                ClearResources();
                 return null;
+            }
 
+            return null;
         }
 
-        // 假设你已经有一个IFeature对象表示原始要素
+        // 根据线要素进行等分
         public void SplitAndCreateNewFeatures(IFeature originalFeature, int segments)
         {
-            IFeatureClass featureClass = originalFeature.Class as IFeatureClass;
-            IWorkspaceEdit workspaceEdit = (featureClass as IDataset).Workspace as IWorkspaceEdit;
+            var featureClass = originalFeature.Class as IFeatureClass;
+            var workspaceEdit = (featureClass as IDataset).Workspace as IWorkspaceEdit;
 
             try
             {
                 workspaceEdit.StartEditing(true);
                 workspaceEdit.StartEditOperation();
 
-                IGeometry originalGeometry = originalFeature.ShapeCopy;
+                var originalGeometry = originalFeature.ShapeCopy;
 
-                ICurve curve = originalGeometry as ICurve;
+                var curve = originalGeometry as ICurve;
                 if (curve != null)
                 {
-                    double length = curve.Length;
-                    double segmentLength = length / segments;
+                    var length = curve.Length;
+                    var segmentLength = length / segments;
 
-                    IPointCollection pointCollection = curve as IPointCollection;
+                    var pointCollection = curve as IPointCollection;
 
-                    IFeatureCursor cursor = featureClass.Insert(true);
-                    for (int i = 0; i < segments; i++)
+                    var cursor = featureClass.Insert(true);
+                    for (var i = 0; i < segments; i++)
                     {
-                        double distanceAlongCurve = i * segmentLength;
+                        var distanceAlongCurve = i * segmentLength;
 
                         IPoint startPoint = new PointClass();
                         curve.QueryPoint(esriSegmentExtension.esriNoExtension, distanceAlongCurve, false, startPoint);
 
                         IPoint endPoint = new PointClass();
-                        curve.QueryPoint(esriSegmentExtension.esriNoExtension, distanceAlongCurve + segmentLength, false, endPoint);
+                        curve.QueryPoint(esriSegmentExtension.esriNoExtension, distanceAlongCurve + segmentLength,
+                            false, endPoint);
 
                         ILine newSegment = new LineClass();
                         newSegment.PutCoords(startPoint, endPoint);
@@ -396,19 +369,17 @@ namespace SMGI.Plugin.CartoExt
                         ISegmentCollection newSegmentCollection = new PolylineClass();
                         newSegmentCollection.AddSegment(newSegment as ISegment);
 
-                        IGeometry newGeometry = newSegmentCollection as IGeometry;
+                        var newGeometry = newSegmentCollection as IGeometry;
 
-                        IFeatureBuffer newFeatureBuffer = featureClass.CreateFeatureBuffer();
+                        var newFeatureBuffer = featureClass.CreateFeatureBuffer();
                         newFeatureBuffer.Shape = newGeometry;
 
                         // 复制其他属性值
-                        for (int fieldIndex = 0; fieldIndex < originalFeature.Fields.FieldCount; fieldIndex++)
+                        for (var fieldIndex = 0; fieldIndex < originalFeature.Fields.FieldCount; fieldIndex++)
                         {
-                            IField field = originalFeature.Fields.Field[fieldIndex];
+                            var field = originalFeature.Fields.Field[fieldIndex];
                             if (field.Type != esriFieldType.esriFieldTypeGeometry)
-                            {
                                 newFeatureBuffer.set_Value(fieldIndex, originalFeature.get_Value(fieldIndex));
-                            }
                         }
 
                         cursor.InsertFeature(newFeatureBuffer);
