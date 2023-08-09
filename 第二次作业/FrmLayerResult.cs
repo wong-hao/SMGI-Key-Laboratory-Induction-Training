@@ -114,19 +114,13 @@ namespace SMGI.Plugin.CartoExt
             cmbSelLayerName.Text = "";
             MessageBox.Show("选择的图层为" + TargetFeatureLayer.Name);
 
-            // 创建 MainForm 实例
-            //MainForm mainForm = new MainForm();
-
-            // 通过属性给 MainForm 的 TargetFeatureLayer 赋值
-            //mainForm.TargetFeatureLayer = TargetFeatureLayer;
-
-
             Close();
 
         }
 
         private void button_cancel_Click(object sender, EventArgs e)
         {
+            MessageBox.Show("用户取消了选择图层操作。", "取消操作", MessageBoxButtons.OK, MessageBoxIcon.Information);
             Close();
         }
 
@@ -141,6 +135,11 @@ namespace SMGI.Plugin.CartoExt
             {
                 MessageBox.Show(ex.Message);
             }
+        }
+
+        private void textBox1_TextChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }
