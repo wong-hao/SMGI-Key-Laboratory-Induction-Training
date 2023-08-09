@@ -28,15 +28,61 @@ namespace SMGI.Plugin.CartoExt
         private IGeometry geometry; // 框选出的几何图形
         private readonly IRubberBand pRubberBand = new RubberPolygonClass(); // 用于框选面要素
         private IFeature SelectedLineFeature; // 用于等分的线要素
+        private IEngineEditor pEngineEditor = null; // 编辑器
+        private IEngineEditTask pEngineEditTask = null;
+        private IEngineEditLayers pEngineEditLayers = null;
 
         public SelectFeaturesTool()
         {
-            m_caption = "参数设置";
+            m_caption = "SelectFeaturesTool";
         }
 
         public override bool Enabled
         {
             get { return true; }
+        }
+
+        /// <summary>
+        /// 开始编辑
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void StartEditing()
+        {
+            try
+            {
+                pEngineEditor = new EngineEditorClass();
+                pEngineEditTask = pEngineEditor as IEngineEditTask;
+                pEngineEditLayers = pEngineEditor as IEngineEditLayers;
+
+                //如果编辑已经开始，则直接退出
+                if (pEngineEditor.EditState != esriEngineEditState.esriEngineStateNotEditing)
+                    return;
+                //获取当前编辑图层工作空间
+                IDataset pDataSet = _frmLayerResult.TargetFeatureLayer.FeatureClass as IDataset;
+                IWorkspace pWs = pDataSet.Workspace;
+                //设置编辑模式，如果是ArcSDE采用版本模式
+                if (pWs.Type == esriWorkspaceType.esriRemoteDatabaseWorkspace)
+                {
+                    pEngineEditor.EditSessionMode = esriEngineEditSessionMode.esriEngineEditSessionModeVersioned;
+                }
+                else
+                {
+                    pEngineEditor.EditSessionMode = esriEngineEditSessionMode.esriEngineEditSessionModeNonVersioned;
+                }
+                //设置编辑任务
+                pEngineEditTask = pEngineEditor.GetTaskByUniqueName("ControlToolsEditing_CreateNewFeatureTask");
+                pEngineEditor.CurrentTask = pEngineEditTask;// 设置编辑任务
+                pEngineEditor.EnableUndoRedo(true); //是否可以进行撤销、恢复操作
+                pEngineEditor.StartEditing(pWs, currentMap); //开始编辑操作
+
+                //设置编辑目标图层
+                pEngineEditLayers.SetTargetLayer(_frmLayerResult.TargetFeatureLayer, 0);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+            }
         }
 
         /// <Date>2023/8/4</Date>
@@ -65,7 +111,7 @@ namespace SMGI.Plugin.CartoExt
             }
 
             //打开提示框
-            showResultForm();
+            ShowResultForm();
         }
 
         // 刷新地图
@@ -183,7 +229,14 @@ namespace SMGI.Plugin.CartoExt
                         throw;
                     }
                 // 右键按下
-                else if (button == 2) PerformRightClickAction();
+                else if (button == 2)
+                {
+                    // 设置编辑器属性
+                    // StartEditing();
+
+                    PerformRightClickAction();
+                }
+                    
             }
         }
 
@@ -198,10 +251,6 @@ namespace SMGI.Plugin.CartoExt
             ClearResources();
 
             MessageBox.Show("工具已退出");
-        }
-
-        public override void OnDblClick()
-        {
         }
 
         // 弹出窗体
@@ -273,7 +322,7 @@ namespace SMGI.Plugin.CartoExt
         /// <summary>
         ///     显示窗体
         /// </summary>
-        private void showResultForm()
+        private void ShowResultForm()
         {
             try
             {
