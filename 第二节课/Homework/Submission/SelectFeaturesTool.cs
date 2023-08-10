@@ -121,6 +121,18 @@ namespace SMGI.Plugin.CartoExt
             return null; // 返回空过滤器，表示没有有效的绘制几何图形
         }
 
+        // 检查选择集中元素数量
+        public void CheckSelectionSet(IFeatureLayer selectedLayer)
+        {
+            if (_featureSelection.SelectionSet.Count != 0)
+                MessageBox.Show("选择集中存在" + _featureSelection.SelectionSet.Count + "个" +
+                                selectedLayer.FeatureClass.ShapeType + "元素", "选择集检查", MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            else
+                MessageBox.Show("选择集中不存在任何与图层" + selectionForm.TargetFeatureLayer.Name + "图形类型匹配的元素", "选择集检查",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
         public override void OnMouseDown(int button, int shift, int x, int y)
         {
             // 确保选定了一个要素图层
@@ -128,7 +140,7 @@ namespace SMGI.Plugin.CartoExt
 
             if (selectedLayer == null)
             {
-                MessageBox.Show("请先通过窗体工具选择目标图层!");
+                MessageBox.Show("请先通过窗体工具选择目标图层!", "图层选择检查", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -143,11 +155,8 @@ namespace SMGI.Plugin.CartoExt
                     var ctrlPressed = (Control.ModifierKeys & Keys.Control) == Keys.Control;
                     SelectFeatures(ctrlPressed);
 
-                    if (_featureSelection.SelectionSet.Count != 0)
-                        MessageBox.Show("选择集中存在" + _featureSelection.SelectionSet.Count + "个" +
-                                        selectedLayer.FeatureClass.ShapeType + "元素");
-                    else
-                        MessageBox.Show("选择集中不存在任何与图层" + selectionForm.TargetFeatureLayer.Name + "图形类型匹配的元素");
+                    // 实时检查选择集
+                    CheckSelectionSet(selectedLayer);
                 }
                 catch (Exception ex)
                 {
