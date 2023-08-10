@@ -82,22 +82,24 @@ namespace SMGI.Plugin.CartoExt
             _currentMapControl.Refresh(esriViewDrawPhase.esriViewGeoSelection, null, null);
         }
 
-        private void PerformSelection(bool ctrlKeyPressed)
+        // 通过空间过滤器框选要素
+        private void SelectFeatures(bool ctrlKeyPressed)
         {
-            // 创建空间过滤器并执行选择
+            // 创建空间过滤器
             var spatialFilter = CreateSpatialFilter();
 
+            // 检查要素选择集合和空间过滤器是否存在
             if (_featureSelection != null && spatialFilter != null)
             {
-                if (ctrlKeyPressed)
-                    // 非清空选择集的多选
-                    _featureSelection.SelectFeatures(spatialFilter, esriSelectionResultEnum.esriSelectionResultAdd,
-                        false);
-                else
-                    // 清空选择集的多选
-                    _featureSelection.SelectFeatures(spatialFilter, esriSelectionResultEnum.esriSelectionResultNew,
-                        false);
+                // 根据 Ctrl 键是否按下，决定选择结果的处理方式
+                var selectionResult = ctrlKeyPressed
+                    ? esriSelectionResultEnum.esriSelectionResultAdd
+                    : esriSelectionResultEnum.esriSelectionResultNew;
 
+                // 选择符合空间过滤器条件的要素，并更新到要素选择集合中
+                _featureSelection.SelectFeatures(spatialFilter, selectionResult, false);
+
+                // 刷新地图以展示更新后的选择效果
                 RefreshMap();
             }
         }
@@ -139,7 +141,7 @@ namespace SMGI.Plugin.CartoExt
                 {
                     // 判断control键是否按下
                     var ctrlPressed = (Control.ModifierKeys & Keys.Control) == Keys.Control;
-                    PerformSelection(ctrlPressed);
+                    SelectFeatures(ctrlPressed);
 
                     if (_featureSelection.SelectionSet.Count != 0)
                         MessageBox.Show("选择集中存在" + _featureSelection.SelectionSet.Count + "个" +
@@ -159,11 +161,17 @@ namespace SMGI.Plugin.CartoExt
                 // 设置编辑器属性
                 // StartEditing();
 
+                ;
                 if (m_Application.EngineEditor.EditState != esriEngineEditState.esriEngineStateEditing)
                 {
                     MessageBox.Show("请打开编辑器!");
                     return;
                 }
+
+                pEngineEditLayers = m_Application.EngineEditor as IEngineEditLayers;
+                pEngineEditLayers.SetTargetLayer(selectionForm.TargetFeatureLayer, 0);
+
+                m_Application.EngineEditor.EnableUndoRedo(true); //是否可以进行撤销、恢复操作
 
                 // 处理右键事件
                 PerformRightClickAction();
@@ -227,11 +235,13 @@ namespace SMGI.Plugin.CartoExt
         {
             base.OnKeyDown(keyCode, shift);
 
-            if (keyCode == (int)Keys.Space) // 按下的是空格键
+            // 按下空格键
+            if (keyCode == (int)Keys.Space)
             {
                 if (_featureSelection != null && _featureSelection.SelectionSet.Count > 0) ShowSelectionInTreeView();
             }
-            else if (keyCode == (int)Keys.Escape) // 按下的是 ESC 键
+            // 按下ESC 键
+            else if (keyCode == (int)Keys.Escape)
             {
                 MessageBox.Show("退出工具");
 

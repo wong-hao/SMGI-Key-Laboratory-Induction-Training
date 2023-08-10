@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Windows.Forms;
 using ESRI.ArcGIS.Carto;
-using ESRI.ArcGIS.Controls;
 
 namespace SMGI.Plugin.CartoExt
 {
@@ -46,10 +45,7 @@ namespace SMGI.Plugin.CartoExt
                             //将图层的名称添加到comboBoxLayerName控件中
                             layerName = compositeLayer.get_Layer(j).Name;
 
-                            if (!cmbSelLayerName.Items.Contains(layerName))
-                            {
-                                cmbSelLayerName.Items.Add(layerName);
-                            }
+                            if (!cmbSelLayerName.Items.Contains(layerName)) cmbSelLayerName.Items.Add(layerName);
                         }
                     }
                     //如果图层不是图层组类型，则直接添加名称
@@ -57,10 +53,7 @@ namespace SMGI.Plugin.CartoExt
                     {
                         layerName = currentMap.get_Layer(i).Name;
 
-                        if (!cmbSelLayerName.Items.Contains(layerName))
-                        {
-                            cmbSelLayerName.Items.Add(layerName);
-                        }
+                        if (!cmbSelLayerName.Items.Contains(layerName)) cmbSelLayerName.Items.Add(layerName);
                     }
 
                 //将控件的默认选项设置为空

@@ -11,7 +11,7 @@ using SMGI.Common;
 
 namespace SMGI.Plugin.CartoExt
 {
-    public class CalculateGeometricRelationshipCmd : SMGICommand
+    public class QueryGeometricRelationshipCmd : SMGICommand
     {
         private static readonly string SourceLayerName = "polygon"; // 面图层名
 
@@ -34,9 +34,9 @@ namespace SMGI.Plugin.CartoExt
         private IFeatureLayer SourceFeatureLayer; // 面图层
         private int SourceFieldIndex; // 面要素名称字段索引
 
-        public CalculateGeometricRelationshipCmd()
+        public QueryGeometricRelationshipCmd()
         {
-            m_caption = "CalculateGeometricRelationshipCmd"; // 扩展的显示名称
+            m_caption = "QueryGeometricRelationshipCmd"; // 扩展的显示名称
         }
 
         public override bool Enabled
@@ -44,13 +44,14 @@ namespace SMGI.Plugin.CartoExt
             get { return true; }
         }
 
+        // 指定的文本文件中追加一个字符串
         public void AppendResult(string result)
         {
             MessageBox.Show(result, "结果", MessageBoxButtons.OK, MessageBoxIcon.Information);
             File.AppendAllText(filePath, result + Environment.NewLine);
         }
 
-        // 计算两个几何体之间的关系
+        // 计算两个几何体之间的关系并存储进文本
         public void CalculateAndAppendRelation(IGeometry geometry1, IGeometry geometry2, string polygonName1,
             string polygonName2, Func<IRelationalOperator, bool> relationFunc, string relationName)
         {
@@ -62,7 +63,7 @@ namespace SMGI.Plugin.CartoExt
             AppendResult(result);
         }
 
-        // 计算几何关系
+        // 计算两个几何体的不同关系（相交、重叠、包含、属于）
         public void GetGeometricRelationship(string polygonName1, string polygonName2, IGeometry geometry1,
             IGeometry geometry2)
         {
@@ -147,7 +148,7 @@ namespace SMGI.Plugin.CartoExt
         ///     执行几何关系查询并将结果保存到文件
         /// </summary>
         /// <returns></returns>
-        public void PerformGeometricRelationshipQueries()
+        public void QueryGeometricRelationship()
         {
             for (var i = 1; i <= FeatureCount - 1; i++)
                 GetGeometricRelationship(featureFieldNamesArray[0], featureFieldNamesArray[i],
@@ -230,7 +231,7 @@ namespace SMGI.Plugin.CartoExt
                 SaveFileWithDialog();
 
                 // 执行几何关系查询并将结果保存到文件
-                PerformGeometricRelationshipQueries();
+                QueryGeometricRelationship();
 
                 MessageBox.Show("要素间的空间关系已判断完成，并保存在" + filePath + "文件中");
             }
