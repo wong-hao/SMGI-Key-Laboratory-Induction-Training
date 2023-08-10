@@ -16,6 +16,10 @@ namespace SMGI.Plugin.CartoExt
         private static readonly string SourceLayerName = "polygon"; // 面图层名
 
         private static string filePath; // 输出文件名
+
+        private readonly string[] featureFieldNamesArray = { "polygon1", "polygon2", "polygon3" }; // 存储面要素名的数组
+
+        private readonly string SourceFieldName = "name"; // 面要素名称字段
         private IMap currentMap; //当前MapControl控件中的Map对象    
 
         private AxMapControl currentMapControl;
@@ -25,14 +29,10 @@ namespace SMGI.Plugin.CartoExt
         private Dictionary<string, IFeature>
             featureDictionary = new Dictionary<string, IFeature>(); //用于存储要素的名称和对应的要素对象的字典
 
-        private readonly string[] featureFieldNamesArray = { "polygon1", "polygon2", "polygon3" }; // 存储面要素名的数组
-
         private int fieldIndex; // 字段索引
         private IFeature[] SourceFeatureArray; // 存储面要素的数组
         private IFeatureLayer SourceFeatureLayer; // 面图层
         private int SourceFieldIndex; // 面要素名称字段索引
-
-        private readonly string SourceFieldName = "name"; // 面要素名称字段
 
         public CalculateGeometricRelationshipCmd()
         {
@@ -44,46 +44,59 @@ namespace SMGI.Plugin.CartoExt
             get { return true; }
         }
 
-        // 计算几何关系
-        public static void GetGeometricRelationship(string polygonName1, string polygonName2, IGeometry geometry1,
-            IGeometry geometry2)
+        public void AppendResult(string result)
         {
-            // 使用 IRelationalOperator 接口来计算两个几何对象之间的空间关系
-            var relationalOperator = geometry1 as IRelationalOperator;
-
-            var intersects = !relationalOperator.Disjoint(geometry2);
-            var crosses = relationalOperator.Crosses(geometry2);
-            var overlaps = relationalOperator.Overlaps(geometry2);
-            var contains = relationalOperator.Contains(geometry2);
-            var within = relationalOperator.Within(geometry2);
-
-            var result = polygonName1 + "与" + polygonName2 + "空间相交关系为" + intersects + "\n" +
-                         polygonName1 + "与" + polygonName2 + "空间重叠关系为" + overlaps + "\n" +
-                         polygonName1 + "与" + polygonName2 + "空间包含关系为" + contains + "\n" +
-                         polygonName1 + "与" + polygonName2 + "空间属于关系为" + within;
-
-            // 将结果追加到txt文件，并在末尾添加换行符
+            MessageBox.Show(result, "结果", MessageBoxButtons.OK, MessageBoxIcon.Information);
             File.AppendAllText(filePath, result + Environment.NewLine);
         }
 
-        // 获取所有面要素，并存储在面要素数组中
-        private void ExtractFeatureArray()
+        // 计算两个几何体之间的关系
+        public void CalculateAndAppendRelation(IGeometry geometry1, IGeometry geometry2, string polygonName1,
+            string polygonName2, Func<IRelationalOperator, bool> relationFunc, string relationName)
         {
-            // 创建字典，用于将名称与要素进行关联
+            var relationalOperator = geometry1 as IRelationalOperator;
+            var relationResult = relationFunc(relationalOperator);
+
+            var result = polygonName1 + "与" + polygonName2 + "空间相交关系为" + relationResult;
+
+            AppendResult(result);
+        }
+
+        // 计算几何关系
+        public void GetGeometricRelationship(string polygonName1, string polygonName2, IGeometry geometry1,
+            IGeometry geometry2)
+        {
+            CalculateAndAppendRelation(geometry1, geometry2, polygonName1, polygonName2, op => !op.Disjoint(geometry2),
+                "相交");
+            CalculateAndAppendRelation(geometry1, geometry2, polygonName1, polygonName2, op => op.Overlaps(geometry2),
+                "重叠");
+            CalculateAndAppendRelation(geometry1, geometry2, polygonName1, polygonName2, op => op.Contains(geometry2),
+                "包含");
+            CalculateAndAppendRelation(geometry1, geometry2, polygonName1, polygonName2, op => op.Contains(geometry2),
+                "属于");
+        }
+
+        /// <summary>
+        ///     从指定要素图层中提取要素并存储到字典中，以“name”字段的值作为键。
+        /// </summary>
+        /// <param name="featureLayer">要素图层</param>
+        /// <returns>以“name”字段的值为键的要素字典</returns>
+        private Dictionary<string, IFeature> ExtractFeatureDictionary(IFeatureLayer featureLayer)
+        {
             var featureDictionary = new Dictionary<string, IFeature>();
 
-            // 使用null作为查询过滤器得到图层中所有要素的游标
-            var featureCursor = SourceFeatureLayer.Search(null, false);
+            // 获取要素游标以遍历要素图层
+            var featureCursor = featureLayer.Search(null, false);
             var feature = featureCursor.NextFeature();
 
             try
             {
                 while (feature != null)
                 {
-                    // 获取“name”字段的内容
+                    // 获取要素的“name”字段的值
                     var nameValue = GetFeatureFieldValue(feature, SourceFieldName);
 
-                    // 将要素按照名称存储到字典中
+                    // 将要素添加到字典，以“name”字段的值作为键
                     featureDictionary[nameValue] = feature;
 
                     feature = featureCursor.NextFeature();
@@ -91,32 +104,47 @@ namespace SMGI.Plugin.CartoExt
             }
             finally
             {
-                // 在 finally 块中确保释放游标资源
+                // 释放要素游标资源
                 ReleaseFeatureCursor(featureCursor);
             }
 
-            // 根据字段名数组的顺序，将对应的要素存储到要素数组中
-            SourceFeatureArray = new IFeature[featureFieldNamesArray.Length];
+            return featureDictionary;
+        }
+
+        /// <summary>
+        ///     根据字段名数组的顺序构建要素数组。
+        /// </summary>
+        /// <param name="featureDictionary">以“name”字段的值为键的要素字典</param>
+        /// <returns>构建的要素数组</returns>
+        private IFeature[] BuildSourceFeatureArray(Dictionary<string, IFeature> featureDictionary)
+        {
+            var sourceFeatureArray = new IFeature[featureFieldNamesArray.Length];
+
             for (var i = 0; i < featureFieldNamesArray.Length; i++)
             {
                 var nameValue = featureFieldNamesArray[i];
+
                 if (featureDictionary.ContainsKey(nameValue))
                 {
-                    SourceFeatureArray[i] = featureDictionary[nameValue];
+                    sourceFeatureArray[i] = featureDictionary[nameValue];
                 }
                 else
                 {
-                    // 处理图层中不存在字段名数组中名称的情况。
+                    // 如果未找到指定名称的要素，显示警告
                     MessageBox.Show("未找到名为" + nameValue + "的要素。", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
+
+                    // 返回空数组，表示未成功构建要素数组
+                    return null;
                 }
             }
+
+            return sourceFeatureArray;
         }
 
         /// <Date>2023/8/08</Date>
         /// <Author>HaoWong</Author>
         /// <summary>
-        /// 执行几何关系查询并将结果保存到文件
+        ///     执行几何关系查询并将结果保存到文件
         /// </summary>
         /// <returns></returns>
         public void PerformGeometricRelationshipQueries()
@@ -129,7 +157,7 @@ namespace SMGI.Plugin.CartoExt
         /// <Date>2023/8/08</Date>
         /// <Author>HaoWong</Author>
         /// <summary>
-        /// 文件操作
+        ///     文件操作
         /// </summary>
         /// <returns></returns>
         public void SaveFileWithDialog()
@@ -154,7 +182,7 @@ namespace SMGI.Plugin.CartoExt
         /// <Date>2023/7/28</Date>
         /// <Author>HaoWong</Author>
         /// <summary>
-        ///  点击扩展按钮时执行的操作
+        ///     点击扩展按钮时执行的操作
         /// </summary>
         public override void OnClick()
         {
@@ -196,7 +224,7 @@ namespace SMGI.Plugin.CartoExt
                 SourceFeatureArray = new IFeature[FeatureCount];
 
                 // 提取面要素并存储
-                ExtractFeatureArray();
+                SourceFeatureArray = BuildSourceFeatureArray(ExtractFeatureDictionary(SourceFeatureLayer));
 
                 // 获取文件保存路径
                 SaveFileWithDialog();
