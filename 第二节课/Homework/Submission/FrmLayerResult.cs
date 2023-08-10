@@ -8,9 +8,7 @@ namespace SMGI.Plugin.CartoExt
     public partial class FrmLayerResult : Form
     {
         public IMap currentMap; //当前MapControl控件中的Map对象
-        public AxMapControl currentMapControl;
-
-        public IFeatureLayer TargetFeatureLayer;
+        public IFeatureLayer TargetFeatureLayer; // 要选择的图层
 
         public FrmLayerResult()
         {
@@ -30,7 +28,7 @@ namespace SMGI.Plugin.CartoExt
         }
 
         // 初始化窗体中的选择框
-        public void initUI()
+        public void initUi()
         {
             try
             {
@@ -47,14 +45,22 @@ namespace SMGI.Plugin.CartoExt
                         {
                             //将图层的名称添加到comboBoxLayerName控件中
                             layerName = compositeLayer.get_Layer(j).Name;
-                            cmbSelLayerName.Items.Add(layerName);
+
+                            if (!cmbSelLayerName.Items.Contains(layerName))
+                            {
+                                cmbSelLayerName.Items.Add(layerName);
+                            }
                         }
                     }
                     //如果图层不是图层组类型，则直接添加名称
                     else
                     {
                         layerName = currentMap.get_Layer(i).Name;
-                        cmbSelLayerName.Items.Add(layerName);
+
+                        if (!cmbSelLayerName.Items.Contains(layerName))
+                        {
+                            cmbSelLayerName.Items.Add(layerName);
+                        }
                     }
 
                 //将控件的默认选项设置为空

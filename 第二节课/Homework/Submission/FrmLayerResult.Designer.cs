@@ -37,17 +37,17 @@
             // 
             this.cmbSelLayerName.AccessibleName = "";
             this.cmbSelLayerName.FormattingEnabled = true;
-            this.cmbSelLayerName.Location = new System.Drawing.Point(57, 92);
+            this.cmbSelLayerName.Location = new System.Drawing.Point(12, 21);
             this.cmbSelLayerName.Name = "cmbSelLayerName";
-            this.cmbSelLayerName.Size = new System.Drawing.Size(179, 20);
+            this.cmbSelLayerName.Size = new System.Drawing.Size(244, 20);
             this.cmbSelLayerName.TabIndex = 0;
             this.cmbSelLayerName.Text = "请选择图层";
             this.cmbSelLayerName.SelectedIndexChanged += new System.EventHandler(this.cmbSelLayerName_SelectedIndexChanged);
             // 
             // button_ok
             // 
-            this.button_ok.Location = new System.Drawing.Point(57, 169);
-            this.button_ok.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.button_ok.Location = new System.Drawing.Point(12, 63);
+            this.button_ok.Margin = new System.Windows.Forms.Padding(2);
             this.button_ok.Name = "button_ok";
             this.button_ok.Size = new System.Drawing.Size(56, 18);
             this.button_ok.TabIndex = 1;
@@ -57,8 +57,8 @@
             // 
             // button_cancel
             // 
-            this.button_cancel.Location = new System.Drawing.Point(180, 169);
-            this.button_cancel.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.button_cancel.Location = new System.Drawing.Point(200, 63);
+            this.button_cancel.Margin = new System.Windows.Forms.Padding(2);
             this.button_cancel.Name = "button_cancel";
             this.button_cancel.Size = new System.Drawing.Size(56, 18);
             this.button_cancel.TabIndex = 2;
@@ -70,12 +70,12 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(284, 261);
+            this.ClientSize = new System.Drawing.Size(268, 95);
             this.Controls.Add(this.button_cancel);
             this.Controls.Add(this.button_ok);
             this.Controls.Add(this.cmbSelLayerName);
             this.Name = "FrmLayerResult";
-            this.Text = "FrmLayerResult";
+            this.Text = "参数输入";
             this.Load += new System.EventHandler(this.FrmLayerResult_Load);
             this.ResumeLayout(false);
 
