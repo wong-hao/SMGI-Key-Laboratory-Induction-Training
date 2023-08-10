@@ -26,45 +26,6 @@ namespace SMGI.Plugin.CartoExt
             return true;
         }
 
-        // 初始化窗体中的选择框
-        public void initUi()
-        {
-            try
-            {
-                string layerName; //设置临时变量存储图层名称
-
-                //对Map中的每个图层进行判断并加载名称
-                for (var i = 0; i < currentMap.LayerCount; i++)
-                    //如果该图层为图层组类型，则分别对所包含的每个图层进行操作
-                    if (currentMap.get_Layer(i) is GroupLayer)
-                    {
-                        //使用ICompositeLayer接口进行遍历操作
-                        var compositeLayer = currentMap.get_Layer(i) as ICompositeLayer;
-                        for (var j = 0; j < compositeLayer.Count; j++)
-                        {
-                            //将图层的名称添加到comboBoxLayerName控件中
-                            layerName = compositeLayer.get_Layer(j).Name;
-
-                            if (!cmbSelLayerName.Items.Contains(layerName)) cmbSelLayerName.Items.Add(layerName);
-                        }
-                    }
-                    //如果图层不是图层组类型，则直接添加名称
-                    else
-                    {
-                        layerName = currentMap.get_Layer(i).Name;
-
-                        if (!cmbSelLayerName.Items.Contains(layerName)) cmbSelLayerName.Items.Add(layerName);
-                    }
-
-                //将控件的默认选项设置为空
-                cmbSelLayerName.SelectedIndex = -1;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message);
-            }
-        }
-
         //在图层名称下拉框控件中所选择图层发生改变时触发事件，执行本函数
         private void cmbSelLayerName_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -116,10 +77,38 @@ namespace SMGI.Plugin.CartoExt
             {
                 //将当前图层列表清空
                 cmbSelLayerName.Items.Clear();
+
+                string layerName; //设置临时变量存储图层名称
+
+                //对Map中的每个图层进行判断并加载名称
+                for (var i = 0; i < currentMap.LayerCount; i++)
+                    //如果该图层为图层组类型，则分别对所包含的每个图层进行操作
+                    if (currentMap.get_Layer(i) is GroupLayer)
+                    {
+                        //使用ICompositeLayer接口进行遍历操作
+                        var compositeLayer = currentMap.get_Layer(i) as ICompositeLayer;
+                        for (var j = 0; j < compositeLayer.Count; j++)
+                        {
+                            //将图层的名称添加到comboBoxLayerName控件中
+                            layerName = compositeLayer.get_Layer(j).Name;
+                            cmbSelLayerName.Items.Add(layerName);
+                        }
+                    }
+                    //如果图层不是图层组类型，则直接添加名称
+                    else
+                    {
+                        layerName = currentMap.get_Layer(i).Name;
+                        cmbSelLayerName.Items.Add(layerName);
+                    }
+
+                //将comboBoxLayerName控件的默认选项设置为空
+                cmbSelLayerName.SelectedIndex = -1;
+                //将comboBoxSelectMethod控件的默认选项设置为空
+                cmbSelLayerName.SelectedIndex = -1;
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message);
+                MessageBox.Show(ex.ToString());
             }
         }
     }

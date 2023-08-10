@@ -270,11 +270,8 @@ namespace SMGI.Plugin.CartoExt
                 if (selectionForm == null || selectionForm.IsDisposed)
                 {
                     selectionForm = new FrmLayerResult();
-
-                    selectionForm.Show();
                     selectionForm.currentMap = currentMap;
-                    selectionForm.initUi();
-                    //selectionForm.ShowDialog();
+                    selectionForm.Show();
                 }
                 else
                 {
