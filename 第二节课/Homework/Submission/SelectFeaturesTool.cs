@@ -94,8 +94,8 @@ namespace SMGI.Plugin.CartoExt
             {
                 // 根据 Ctrl 键是否按下，决定选择结果的处理方式
                 var selectionResult = ctrlKeyPressed
-                    ? esriSelectionResultEnum.esriSelectionResultAdd
-                    : esriSelectionResultEnum.esriSelectionResultNew;
+                    ? esriSelectionResultEnum.esriSelectionResultAdd // 现有选择集不清空
+                    : esriSelectionResultEnum.esriSelectionResultNew; // 清空选择集
 
                 // 选择符合空间过滤器条件的要素，并更新到要素选择集合中
                 _featureSelection.SelectFeatures(spatialFilter, selectionResult, false);

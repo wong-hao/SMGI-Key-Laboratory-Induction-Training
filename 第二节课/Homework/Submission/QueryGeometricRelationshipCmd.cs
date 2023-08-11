@@ -38,7 +38,7 @@ namespace SMGI.Plugin.CartoExt
 
         public QueryGeometricRelationshipCmd()
         {
-            m_caption = "QueryGeometricRelationshipCmd"; // 扩展的显示名称
+            m_caption = "QueryBySpatialCmd"; // 扩展的显示名称
         }
 
         public override bool Enabled
