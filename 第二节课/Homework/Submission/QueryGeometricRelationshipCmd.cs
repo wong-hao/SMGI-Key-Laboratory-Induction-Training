@@ -15,9 +15,11 @@ namespace SMGI.Plugin.CartoExt
     {
         private static readonly string SourceLayerName = "polygon"; // 面图层名
 
-        private static string filePath; // 输出文件名
+        private static string filePath = string.Empty; // 输出文件名
 
-        private readonly string[] featureFieldNamesArray = { "polygon1", "polygon2", "polygon3" }; // 存储面要素名的数组
+        private static readonly string[] featureFieldNamesArray = { "polygon1", "polygon2", "polygon3" }; // 存储面要素名的数组
+
+        private readonly int NamesArrayLength = featureFieldNamesArray.Length;
 
         private readonly string SourceFieldName = "name"; // 面要素名称字段
         private IMap currentMap; //当前MapControl控件中的Map对象    
@@ -48,6 +50,7 @@ namespace SMGI.Plugin.CartoExt
         public void AppendResult(string result)
         {
             MessageBox.Show(result, "结果", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
             File.AppendAllText(filePath, result + Environment.NewLine);
         }
 
@@ -58,7 +61,7 @@ namespace SMGI.Plugin.CartoExt
             var relationalOperator = geometry1 as IRelationalOperator;
             var relationResult = relationFunc(relationalOperator);
 
-            var result = polygonName1 + "与" + polygonName2 + "空间相交关系为" + relationResult;
+            var result = polygonName1 + "与" + polygonName2 + "空间" + relationName + "关系为" + relationResult;
 
             AppendResult(result);
         }
@@ -119,12 +122,14 @@ namespace SMGI.Plugin.CartoExt
         /// <returns>构建的要素数组</returns>
         private IFeature[] BuildSourceFeatureArray(Dictionary<string, IFeature> featureDictionary)
         {
-            var sourceFeatureArray = new IFeature[featureFieldNamesArray.Length];
+            var sourceFeatureArray = new IFeature[NamesArrayLength];
 
-            for (var i = 0; i < featureFieldNamesArray.Length; i++)
+            // 遍历要素名数组
+            for (var i = 0; i <= NamesArrayLength - 1; i++)
             {
                 var nameValue = featureFieldNamesArray[i];
 
+                // 当字典键出现要素名时，将对应值赋给数组
                 if (featureDictionary.ContainsKey(nameValue))
                 {
                     sourceFeatureArray[i] = featureDictionary[nameValue];
@@ -150,9 +155,14 @@ namespace SMGI.Plugin.CartoExt
         /// <returns></returns>
         public void QueryGeometricRelationship()
         {
+            // 若存储路径为空则放弃操作
+            if (string.IsNullOrEmpty(filePath)) return;
+
             for (var i = 1; i <= FeatureCount - 1; i++)
                 GetGeometricRelationship(featureFieldNamesArray[0], featureFieldNamesArray[i],
                     SourceFeatureArray[0].Shape, SourceFeatureArray[i].Shape);
+
+            MessageBox.Show("要素间的空间关系已判断完成，并保存在" + filePath + "文件中");
         }
 
         /// <Date>2023/8/08</Date>
@@ -233,7 +243,7 @@ namespace SMGI.Plugin.CartoExt
                 // 执行几何关系查询并将结果保存到文件
                 QueryGeometricRelationship();
 
-                MessageBox.Show("要素间的空间关系已判断完成，并保存在" + filePath + "文件中");
+                filePath = string.Empty;
             }
             catch (Exception ex)
             {

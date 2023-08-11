@@ -6,8 +6,8 @@ namespace SMGI.Plugin.CartoExt
 {
     public partial class FrmLayerResult : Form
     {
+        public IFeatureLayer _selectedFeatureLayer; // 要选择的图层
         public IMap currentMap; //当前MapControl控件中的Map对象
-        public IFeatureLayer TargetFeatureLayer; // 要选择的图层
 
         public FrmLayerResult()
         {
@@ -15,7 +15,7 @@ namespace SMGI.Plugin.CartoExt
         }
 
         // 检查是否已选择图层
-        private bool check()
+        private bool CheckSelectedLayer()
         {
             if (cmbSelLayerName.SelectedIndex == -1)
             {
@@ -29,49 +29,39 @@ namespace SMGI.Plugin.CartoExt
         //在图层名称下拉框控件中所选择图层发生改变时触发事件，执行本函数
         private void cmbSelLayerName_SelectedIndexChanged(object sender, EventArgs e)
         {
-            for (var i = 0; i < currentMap.LayerCount; i++)
-                if (currentMap.get_Layer(i) is GroupLayer)
-                {
-                    var compositeLayer = currentMap.get_Layer(i) as ICompositeLayer;
-                    for (var j = 0; j < compositeLayer.Count; j++)
-                        //判断图层的名称是否与控件中选择的图层名称相同
-                        if (compositeLayer.get_Layer(j).Name == cmbSelLayerName.SelectedItem.ToString())
-                        {
-                            //如果相同则设置为整个窗体所使用的IFeatureLayer接口对象
-                            TargetFeatureLayer = compositeLayer.get_Layer(j) as IFeatureLayer;
-                            break;
-                        }
-                }
-                else
-                {
-                    //判断图层的名称是否与控件中选择的图层名称相同
-                    if (currentMap.get_Layer(i).Name == cmbSelLayerName.SelectedItem.ToString())
-                    {
-                        //如果相同则设置为整个窗体所使用的IFeatureLayer接口对象
-                        TargetFeatureLayer = currentMap.get_Layer(i) as IFeatureLayer;
-                        break;
-                    }
-                }
+            // 实时获取所选图层
+            GetSelectedFeatureLayer();
         }
 
         private void button_ok_Click(object sender, EventArgs e)
         {
-            if (!check()) return;
+            // 检查是否有图层被选中
+            if (!CheckSelectedLayer()) return;
 
-            cmbSelLayerName.Items.Clear();
-            cmbSelLayerName.Text = "";
-            MessageBox.Show("选择的图层为" + TargetFeatureLayer.Name);
+            // 清空已选图层
+            ClearSelectedFeatureLayer();
+
+            MessageBox.Show("选择的图层为" + _selectedFeatureLayer.Name);
 
             Close();
         }
 
         private void button_cancel_Click(object sender, EventArgs e)
         {
+            // 清空已选图层
+            ClearSelectedFeatureLayer();
+
             MessageBox.Show("用户取消了选择图层操作，请使用Esc键退出工具。", "取消操作", MessageBoxButtons.OK, MessageBoxIcon.Information);
             Close();
         }
 
         private void FrmLayerResult_Load(object sender, EventArgs e)
+        {
+            InitFeatureLayersUi();
+        }
+
+        // 初始化图层界面
+        public void InitFeatureLayersUi()
         {
             try
             {
@@ -105,6 +95,55 @@ namespace SMGI.Plugin.CartoExt
                 cmbSelLayerName.SelectedIndex = -1;
                 //将comboBoxSelectMethod控件的默认选项设置为空
                 cmbSelLayerName.SelectedIndex = -1;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+            }
+        }
+
+        // 选择目标图层
+        public void GetSelectedFeatureLayer()
+        {
+            try
+            {
+                for (var i = 0; i < currentMap.LayerCount; i++)
+                    if (currentMap.get_Layer(i) is GroupLayer)
+                    {
+                        var compositeLayer = currentMap.get_Layer(i) as ICompositeLayer;
+                        for (var j = 0; j < compositeLayer.Count; j++)
+                            //判断图层的名称是否与控件中选择的图层名称相同
+                            if (compositeLayer.get_Layer(j).Name == cmbSelLayerName.SelectedItem.ToString())
+                            {
+                                //如果相同则设置为整个窗体所使用的IFeatureLayer接口对象
+                                _selectedFeatureLayer = compositeLayer.get_Layer(j) as IFeatureLayer;
+                                break;
+                            }
+                    }
+                    else
+                    {
+                        //判断图层的名称是否与控件中选择的图层名称相同
+                        if (currentMap.get_Layer(i).Name == cmbSelLayerName.SelectedItem.ToString())
+                        {
+                            //如果相同则设置为整个窗体所使用的IFeatureLayer接口对象
+                            _selectedFeatureLayer = currentMap.get_Layer(i) as IFeatureLayer;
+                            break;
+                        }
+                    }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+            }
+        }
+
+        // 清空选择的图层
+        public void ClearSelectedFeatureLayer()
+        {
+            try
+            {
+                cmbSelLayerName.Items.Clear();
+                cmbSelLayerName.Text = "";
             }
             catch (Exception ex)
             {

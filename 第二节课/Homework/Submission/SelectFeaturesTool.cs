@@ -15,6 +15,7 @@ namespace SMGI.Plugin.CartoExt
 
         private AxMapControl _currentMapControl; // 当前的MapControl控件
         private IFeatureSelection _featureSelection; // 选择集
+        private int _featureSelectionCount; // 选择集大小
         private IMap currentMap; // 当前MapControl控件中的Map对象   
         private int divideCount; // 等分的份数
         private IGeometry geometry; // 框选出的几何图形
@@ -99,6 +100,9 @@ namespace SMGI.Plugin.CartoExt
                 // 选择符合空间过滤器条件的要素，并更新到要素选择集合中
                 _featureSelection.SelectFeatures(spatialFilter, selectionResult, false);
 
+                // 计算选择集大小
+                _featureSelectionCount = _featureSelection.SelectionSet.Count;
+
                 // 刷新地图以展示更新后的选择效果
                 RefreshMap();
             }
@@ -124,20 +128,21 @@ namespace SMGI.Plugin.CartoExt
         // 检查选择集中元素数量
         public void CheckSelectionSet(IFeatureLayer selectedLayer)
         {
-            if (_featureSelection.SelectionSet.Count != 0)
-                MessageBox.Show("选择集中存在" + _featureSelection.SelectionSet.Count + "个" +
+            if (_featureSelectionCount != 0)
+                MessageBox.Show("选择集中存在" + _featureSelectionCount + "个" +
                                 selectedLayer.FeatureClass.ShapeType + "元素", "选择集检查", MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
             else
-                MessageBox.Show("选择集中不存在任何与图层" + selectionForm.TargetFeatureLayer.Name + "图形类型匹配的元素", "选择集检查",
+                MessageBox.Show("选择集中不存在任何与图层" + selectionForm._selectedFeatureLayer.Name + "图形类型匹配的元素", "选择集检查",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         public override void OnMouseDown(int button, int shift, int x, int y)
         {
             // 确保选定了一个要素图层
-            var selectedLayer = selectionForm.TargetFeatureLayer;
+            var selectedLayer = selectionForm._selectedFeatureLayer;
 
+            // 检查目标图层是否为空
             if (selectedLayer == null)
             {
                 MessageBox.Show("请先通过窗体工具选择目标图层!", "图层选择检查", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -170,15 +175,20 @@ namespace SMGI.Plugin.CartoExt
                 // 设置编辑器属性
                 // StartEditing();
 
-                ;
                 if (m_Application.EngineEditor.EditState != esriEngineEditState.esriEngineStateEditing)
                 {
-                    MessageBox.Show("请打开编辑器!");
+                    MessageBox.Show("请打开编辑器!", "编辑器检查",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 
                 pEngineEditLayers = m_Application.EngineEditor as IEngineEditLayers;
-                pEngineEditLayers.SetTargetLayer(selectionForm.TargetFeatureLayer, 0);
+
+                if (selectionForm._selectedFeatureLayer.FeatureClass.ShapeType != esriGeometryType.esriGeometryPolyline)
+                    MessageBox.Show("请选择线图层!", "图层检查",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                pEngineEditLayers.SetTargetLayer(selectionForm._selectedFeatureLayer, 0);
 
                 m_Application.EngineEditor.EnableUndoRedo(true); //是否可以进行撤销、恢复操作
 
@@ -207,7 +217,7 @@ namespace SMGI.Plugin.CartoExt
         {
             // 检查选择集是否有要素
             if (_featureSelection != null && _featureSelection.SelectionSet != null &&
-                _featureSelection.SelectionSet.Count > 0)
+                _featureSelectionCount > 0)
             {
                 // 创建一个窗体
                 var selectionForm = new Form();
@@ -247,7 +257,7 @@ namespace SMGI.Plugin.CartoExt
             // 按下空格键
             if (keyCode == (int)Keys.Space)
             {
-                if (_featureSelection != null && _featureSelection.SelectionSet.Count > 0) ShowSelectionInTreeView();
+                if (_featureSelection != null && _featureSelectionCount > 0) ShowSelectionInTreeView();
             }
             // 按下ESC 键
             else if (keyCode == (int)Keys.Escape)
@@ -299,8 +309,8 @@ namespace SMGI.Plugin.CartoExt
         {
             try
             {
-                // 没有选有线要素
-                if (_featureSelection.SelectionSet.Count == 0)
+                // 没有选有要素
+                if (_featureSelectionCount == 0)
                 {
                     MessageBox.Show("请先选择单个线要素");
 
@@ -310,8 +320,8 @@ namespace SMGI.Plugin.CartoExt
                     return;
                 }
 
-                // 选有单个线要素
-                if (_featureSelection.SelectionSet.Count == 1)
+                // 选有单个要素
+                if (_featureSelectionCount == 1)
                 {
                     SelectedLineFeature = GetSelectedLineFeature(_featureSelection);
 
@@ -334,8 +344,8 @@ namespace SMGI.Plugin.CartoExt
                     // 刷新地图显示
                     RefreshMap();
                 }
-                // 选有多个线要素
-                else if (_featureSelection.SelectionSet.Count > 1)
+                // 选有多个要素
+                else if (_featureSelectionCount > 1)
                 {
                     MessageBox.Show("请先选择单个线要素");
 
@@ -470,7 +480,7 @@ namespace SMGI.Plugin.CartoExt
                 if (pEngineEditor.EditState != esriEngineEditState.esriEngineStateNotEditing)
                     return;
                 //获取当前编辑图层工作空间
-                var pDataSet = selectionForm.TargetFeatureLayer.FeatureClass as IDataset;
+                var pDataSet = selectionForm._selectedFeatureLayer.FeatureClass as IDataset;
                 var pWs = pDataSet.Workspace;
                 //设置编辑模式，如果是ArcSDE采用版本模式
                 if (pWs.Type == esriWorkspaceType.esriRemoteDatabaseWorkspace)
@@ -484,7 +494,7 @@ namespace SMGI.Plugin.CartoExt
                 pEngineEditor.StartEditing(pWs, currentMap); //开始编辑操作
 
                 //设置编辑目标图层
-                pEngineEditLayers.SetTargetLayer(selectionForm.TargetFeatureLayer, 0);
+                pEngineEditLayers.SetTargetLayer(selectionForm._selectedFeatureLayer, 0);
             }
             catch (Exception ex)
             {
